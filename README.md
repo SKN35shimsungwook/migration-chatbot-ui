@@ -1,5 +1,7 @@
 # 마이그레이션 챗봇 화면 (4번 · 화면)
 
+**배포 주소**: [https://migration-chatbot-ui-47wunvzaww7qc27nmwufvh.streamlit.app/](https://migration-chatbot-ui-47wunvzaww7qc27nmwufvh.streamlit.app/)
+
 > 팀 프로젝트 **LangChain 버전 마이그레이션 챗봇**의 화면을 먼저 만들어 보는 4번 작업 저장소입니다.
 > 팀 저장소와 **같은 폴더 구조**로 만들어서, 완성되면 4번이 직접 팀 저장소의 4번 브랜치로 옮겨 PR합니다.
 > 1 · 2 · 3번의 코드는 이 저장소에 넣지 않았습니다 (`src/agents`, `src/graph`, `src/rag`, `data`는 빈 자리).
