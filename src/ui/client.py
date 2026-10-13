@@ -5,8 +5,10 @@
 """
 
 from .mock import run_mock
+from .versions import SUMMARY, detect
 
-TARGET_VERSIONS = ["1.x"]
+TARGET_VERSIONS = SUMMARY["targets"]          # 지금 2번 대응표의 목표는 1.x 하나
+LATEST = SUMMARY["latest"]                    # 예: {"langchain": "1.4.4", "langchain-core": "1.6.10"}
 
 
 def mode() -> str:
@@ -18,7 +20,13 @@ def mode() -> str:
         return "mock"
 
 
-def run(code: str, target_version: str = TARGET_VERSIONS[0]) -> dict:
-    """옛 코드를 넣으면 결과(dict)를 돌려준다. 모양은 docs/화면_결과_모양.md."""
+def run(code: str, target_version: str = TARGET_VERSIONS[0], source_version: str | None = None) -> dict:
+    """옛 코드를 넣으면 결과(dict)를 돌려준다. 모양은 docs/화면_결과_모양.md.
+
+    source_version: 사용자가 고른 옛 버전 (None 이면 자동 감지). 결과에 감지 결과도 담는다.
+    """
     # TODO(1번 그래프 연결 후): from src.graph.supervisor import ... 로 진짜 결과 받기
-    return run_mock(code, target_version)
+    result = run_mock(code, target_version)
+    result["source_version"] = source_version
+    result["detected"] = detect(code)
+    return result

@@ -23,6 +23,9 @@ SAMPLE_MAP = {
     "langchain.memory.ConversationBufferMemory":
         ("langchain_classic.memory.ConversationBufferMemory", "classic_fallback", "langchain.agents.create_agent"),
     "langchain.agents.initialize_agent": ("langchain_classic.agents.initialize_agent", "classic_fallback", "langchain.agents.create_agent"),
+    "langchain.agents.create_tool_calling_agent":
+        ("langchain_classic.agents.create_tool_calling_agent", "classic_fallback", None),
+    "langchain.LLMBashChain": (None, "unresolved", None),
 }
 
 FROM_IMPORT = re.compile(r"^\s*from\s+([\w.]+)\s+import\s+(.+)$")

@@ -1,22 +1,27 @@
 """LangChain 마이그레이션 챗봇 화면 (4번 화면 · 평가).
 
 실행 (프로젝트 루트에서):
-    uv add streamlit          # 팀 저장소에서는 1번과 상의 후
+    uv add streamlit plotly   # 팀 저장소에서는 1번과 상의 후
     uv run streamlit run app.py
 
-구성: 왼쪽 채팅(옛 코드 넣기) + 오른쪽 결과 패널(전후 비교 · 근거 · 진행 과정).
+흐름: ① 시작 화면(버전 마인드맵에서 옛 버전 고르기, 모르면 자동 감지)
+      → ② 목표 버전 확인 (최신 버전 안내)
+      → ③ 채팅 + 결과 패널 (전후 비교 · 근거 · 진행 과정)
 챗봇 호출은 src/ui/client.py 한 곳에서만 한다. 지금은 가짜 결과, 근거는 2번 대응표가 있으면 실제.
 """
 
 import difflib
 import time
 
+import plotly.express as px
 import streamlit as st
 
-from src.ui.client import TARGET_VERSIONS, mode, run
+from src.ui.client import LATEST, TARGET_VERSIONS, mode, run
+from src.ui.versions import ALL, SUMMARY, describe
 
 st.set_page_config(page_title="LangChain 마이그레이션 챗봇", page_icon=":material/sync_alt:", layout="wide")
 
+AUTO = "모르겠어요 (자동 감지)"
 EXAMPLES = {
     "쉬움 · import 경로": (
         "from langchain.chat_models import ChatOpenAI\n"
@@ -41,6 +46,12 @@ EXAMPLES = {
         "memory = ConversationBufferMemory()\n"
         "agent = initialize_agent([], llm, memory=memory)"
     ),
+    "버전 단서 · tool calling 에이전트": (
+        "from langchain_openai import ChatOpenAI\n"
+        "from langchain.agents import create_tool_calling_agent\n\n"
+        "llm = ChatOpenAI(temperature=0)\n"
+        "agent = create_tool_calling_agent(llm, tools=[], prompt=prompt)"
+    ),
 }
 KIND_LABEL = {"native": "최신 위치", "classic_fallback": "옛 창고(classic)", "unresolved": "못 찾음"}
 MODE_BADGE = {
@@ -49,28 +60,106 @@ MODE_BADGE = {
     "graph": ("팀 챗봇 연결됨", "green"),
 }
 
-st.session_state.setdefault("messages", [])
-st.session_state.setdefault("results", [])
+ss = st.session_state
+ss.setdefault("stage", "start")            # start → confirm → chat
+ss.setdefault("source", None)              # 고른 옛 버전, None 이면 자동 감지
+ss.setdefault("target", TARGET_VERSIONS[0])
+ss.setdefault("messages", [])
+ss.setdefault("results", [])
+
+
+def go(stage: str) -> None:
+    ss["stage"] = stage
+
+
+def source_label() -> str:
+    return "자동 감지" if ss["source"] is None else f"LangChain {ss['source']}"
+
 
 # ---------------------------------------------------------------- 사이드바
 with st.sidebar:
     st.title("마이그레이션 챗봇")
     st.caption("옛 LangChain 코드를 최신 버전으로 고치고, 근거와 검증 결과를 함께 보여 줍니다.")
-    target = st.selectbox("목표 버전", [f"LangChain {v}" for v in TARGET_VERSIONS]).removeprefix("LangChain ")
     label, color = MODE_BADGE[mode()]
     st.badge(label, icon=":material/lan:", color=color)
-    st.subheader("예제로 해 보기", divider="gray")
-    for name, code in EXAMPLES.items():
-        if st.button(name, width="stretch"):
-            st.session_state["pending"] = code
-    if st.button("대화 지우기", icon=":material/delete:", width="stretch"):
-        st.session_state["messages"], st.session_state["results"] = [], []
-        st.rerun()
+    if ss["stage"] == "chat":
+        st.subheader("버전", divider="gray")
+        st.markdown(f"**{source_label()}** → **LangChain {ss['target']}**")
+        st.button("버전 다시 고르기", icon=":material/account_tree:", width="stretch", on_click=go, args=("start",))
+        st.subheader("예제로 해 보기", divider="gray")
+        for name, code in EXAMPLES.items():
+            if st.button(name, width="stretch"):
+                ss["pending"] = code
+        if st.button("대화 지우기", icon=":material/delete:", width="stretch"):
+            ss["messages"], ss["results"] = [], []
+            st.rerun()
 
 convert_tab, compare_tab, about_tab = st.tabs(
     [":material/forum: 변환하기", ":material/bar_chart: 비교 (준비 중)", ":material/info: 프로젝트 소개"])
 
 
+# ---------------------------------------------------------------- ① 시작: 버전 마인드맵
+def version_map():
+    rows = []
+    for v in SUMMARY["versions"]:
+        for a in v["areas"]:
+            rows.append({"root": "LangChain", "version": v["version"], "area": a["name"], "count": a["total"]})
+    fig = px.sunburst(rows, path=["root", "version", "area"], values="count", color="version",
+                      color_discrete_sequence=px.colors.qualitative.Set2)
+    fig.update_traces(hovertemplate="%{label}<br>기능 %{value:,}개<extra></extra>", insidetextorientation="radial")
+    fig.update_layout(margin=dict(t=8, l=8, r=8, b=8), height=430)
+    return fig
+
+
+def start_screen():
+    st.subheader("어떤 버전의 LangChain 코드를 바꾸시나요?", divider="blue")
+    left, right = st.columns([1.2, 1], gap="large")
+    with left:
+        st.plotly_chart(version_map(), width="stretch", config={"displayModeBar": False})
+        st.caption("가운데에서 바깥으로: LangChain → 옛 버전 → 영역(chains, agents …). 조각을 누르면 확대됩니다. "
+                   f"숫자는 2번 import 대응표 기준.")
+    with right:
+        st.markdown("**옛 버전 고르기**")
+        choice = st.pills("옛 버전", [*ALL, AUTO], label_visibility="collapsed", key="pick")
+        if choice:
+            info = next((v for v in SUMMARY["versions"] if v["version"] == choice), None)
+            if info:
+                k = info["kinds"]
+                with st.container(border=True):
+                    st.markdown(f"**LangChain {choice}** 의 기능 **{info['total']:,}개**가 1.x에서 이렇게 바뀌어요")
+                    c1, c2, c3 = st.columns(3)
+                    c1.metric("최신 위치로 이사", f"{k.get('native', 0):,}")
+                    c2.metric("옛 창고(classic)", f"{k.get('classic_fallback', 0):,}")
+                    c3.metric("못 찾음", f"{k.get('unresolved', 0):,}")
+                    st.caption("기능이 많은 영역: " + ", ".join(f"{a['name']} {a['total']:,}" for a in info["areas"][:4]))
+            else:
+                st.info("코드를 넣으면 어느 버전 시기의 코드인지 짐작해서 알려 드려요.", icon=":material/search:")
+            if st.button("다음: 목표 버전 확인", type="primary", icon=":material/arrow_forward:"):
+                ss["source"] = None if choice == AUTO else choice
+                go("confirm")
+                st.rerun()
+
+
+# ---------------------------------------------------------------- ② 목표 버전 확인
+def confirm_screen():
+    st.subheader("목표 버전을 확인해 주세요", divider="blue")
+    with st.container(border=True):
+        a, arrow, b = st.columns([1, 0.3, 1], vertical_alignment="center")
+        a.metric("바꿀 코드", source_label())
+        arrow.markdown("### →")
+        b.metric("목표 버전", f"LangChain {ss['target']}")
+        st.caption(f"현재 최신 버전: langchain **{LATEST['langchain']}** · langchain-core **{LATEST['langchain-core']}** "
+                   "(2번 데이터 기준). 지금은 1.x로 바꾸는 것만 지원해요.")
+    c1, c2 = st.columns([1, 4])
+    if c1.button("확인하고 시작", type="primary", icon=":material/check:"):
+        go("chat")
+        st.rerun()
+    if c2.button("다시 고르기", icon=":material/arrow_back:"):
+        go("start")
+        st.rerun()
+
+
+# ---------------------------------------------------------------- ③ 채팅 + 결과
 def summary(result: dict) -> str:
     v = result["verification"]
     if not v["success"]:
@@ -78,13 +167,27 @@ def summary(result: dict) -> str:
     changes = result["changes"]
     classic = [c for c in changes if c["kind"] == "classic_fallback"]
     lcel = [c for c in classic if "StrOutputParser" in c["new"]]
+    missing = [c for c in changes if c["kind"] == "unresolved"]
     extra = ""
     if lcel:
         extra += f" 1.x에서 없어진 기능 {len(lcel)}개는 최신 방식(LCEL)으로 바꿨어요."
     if len(classic) > len(lcel):
         extra += f" {len(classic) - len(lcel)}개는 옛 창고(classic) 위치와 대안을 같이 안내해요."
+    if missing:
+        extra += f" {len(missing)}개는 1.x에서 옮길 곳을 찾지 못했어요."
     return (f"import {len(changes)}줄을 찾아 고쳤어요.{extra} 검증은 {v['attempts']}회 만에 통과했어요. "
             "오른쪽에서 자세히 보세요.")
+
+
+def version_note(result: dict) -> str | None:
+    d = result["detected"]
+    if result["source_version"] is None:
+        return describe(d)
+    if result["source_version"] not in d["candidates"]:
+        span = d["candidates"][0] if len(d["candidates"]) == 1 else f"{d['candidates'][0]} ~ {d['candidates'][-1]}"
+        return (f"고르신 버전은 {result['source_version']}인데, 코드는 **{span}** 시기 코드로 보여요 "
+                f"(단서: {', '.join(d['clues'])}). 변환은 그대로 진행했어요.")
+    return None
 
 
 def show_result(result: dict) -> None:
@@ -94,7 +197,8 @@ def show_result(result: dict) -> None:
             st.badge(f"검증 통과 · {v['attempts']}회", icon=":material/check_circle:", color="green")
         else:
             st.badge("변환 못 함", icon=":material/error:", color="red")
-        st.badge(f"목표 LangChain {result['target_version']}", icon=":material/flag:", color="gray")
+        st.badge(f"{result['source_version'] or '자동 감지'} → {result['target_version']}", icon=":material/flag:",
+                 color="gray")
         if result["changes"]:
             real = all(c["real_evidence"] for c in result["changes"])
             st.badge("근거: 2번 대응표" if real else "근거: 예시", icon=":material/menu_book:",
@@ -114,54 +218,63 @@ def show_result(result: dict) -> None:
         with st.expander("바뀐 줄만 보기"):
             st.code("\n".join(diff), language="diff")
     with after:
-        rows = [{"옛 줄": c["old"], "새 줄": c["new"], "종류": KIND_LABEL.get(c["kind"], c["kind"]),
-                 "대안": c["alternative"] or "", "근거 ID": c["evidence_id"]} for c in result["changes"]]
-        st.table(rows)
+        st.table([{"옛 줄": c["old"], "새 줄": c["new"], "종류": KIND_LABEL.get(c["kind"], c["kind"]),
+                   "대안": c["alternative"] or "", "근거 ID": c["evidence_id"]} for c in result["changes"]])
         st.caption("옛 창고(classic)는 1.x에서 없어져 langchain_classic에만 남은 기능입니다. 대안이 있으면 최신 방식으로 바꿉니다.")
     with steps:
         for s in result["steps"]:
             st.markdown(f"**{s['name']}** · {s['detail']}")
 
 
-# ---------------------------------------------------------------- 변환하기
-with convert_tab:
+def chat_screen():
+    top_l, top_r = st.columns([3, 1], vertical_alignment="center")
+    top_l.markdown(f"#### {source_label()} → LangChain {ss['target']}")
+    top_r.button("버전 다시 고르기", icon=":material/account_tree:", on_click=go, args=("start",), key="reselect_top")
     chat_col, result_col = st.columns([1, 1.25], gap="large")
     with chat_col:
         box = st.container(height=520)
         with box:
-            if not st.session_state["messages"]:
+            if not ss["messages"]:
                 with st.chat_message("assistant"):
-                    st.write("옛 LangChain 코드를 붙여 넣어 주세요. 왼쪽 예제 버튼으로 바로 해 볼 수도 있어요.")
-            for m in st.session_state["messages"]:
+                    hint = ("버전을 모르셔도 괜찮아요. 코드를 넣으면 어느 시기 코드인지 알려 드릴게요."
+                            if ss["source"] is None else f"{ss['source']} 시기 코드를 붙여 넣어 주세요.")
+                    st.write(f"옛 LangChain 코드를 붙여 넣어 주세요. {hint} 왼쪽 예제 버튼으로 바로 해 볼 수도 있어요.")
+            for m in ss["messages"]:
                 with st.chat_message(m["role"]):
                     if m["role"] == "user":
                         st.code(m["content"], language="python", wrap_lines=True)
                     else:
-                        st.write(m["content"])
+                        st.markdown(m["content"])
         typed = st.chat_input("옛 코드를 붙여 넣으세요 (여러 줄은 Shift+Enter)")
-        code = typed or st.session_state.pop("pending", None)
+        code = typed or ss.pop("pending", None)
         if code:
-            st.session_state["messages"].append({"role": "user", "content": code})
+            ss["messages"].append({"role": "user", "content": code})
             with box:
                 with st.chat_message("user"):
                     st.code(code, language="python", wrap_lines=True)
                 with st.chat_message("assistant"):
                     with st.status("변환하는 중...", expanded=True) as status:
-                        result = run(code, target)
+                        result = run(code, ss["target"], ss["source"])
                         for s in result["steps"]:
                             st.write(f"{s['name']} · {s['detail']}")
                             time.sleep(0.25)
                         status.update(label="완료", state="complete" if result["verification"]["success"] else "error",
                                       expanded=False)
-                    st.write(summary(result))
-            st.session_state["messages"].append({"role": "assistant", "content": summary(result)})
-            st.session_state["results"].append(result)
+                    note = version_note(result) if result["changes"] else None
+                    reply = (note + "\n\n" if note else "") + summary(result)
+                    st.markdown(reply)
+            ss["messages"].append({"role": "assistant", "content": reply})
+            ss["results"].append(result)
     with result_col:
         st.subheader("결과", divider="blue")
-        if st.session_state["results"]:
-            show_result(st.session_state["results"][-1])
+        if ss["results"]:
+            show_result(ss["results"][-1])
         else:
             st.info("코드를 넣으면 여기에 전후 비교, 바뀐 줄과 근거, 진행 과정이 나옵니다.", icon=":material/arrow_back:")
+
+
+with convert_tab:
+    {"start": start_screen, "confirm": confirm_screen, "chat": chat_screen}[ss["stage"]]()
 
 # ---------------------------------------------------------------- 비교 (평가)
 with compare_tab:
