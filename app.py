@@ -1,7 +1,7 @@
 """LangChain 마이그레이션 챗봇 화면 (4번 화면 · 평가).
 
 실행 (프로젝트 루트에서):
-    uv add streamlit plotly   # 팀 저장소에서는 1번과 상의 후
+    uv add streamlit          # 팀 저장소에서는 1번과 상의 후
     uv run streamlit run app.py
 
 흐름: ① 시작 화면(버전 마인드맵에서 옛 버전 고르기, 모르면 자동 감지)
@@ -13,10 +13,10 @@
 import difflib
 import time
 
-import plotly.express as px
 import streamlit as st
 
 from src.ui.client import LATEST, TARGET_VERSIONS, mode, run
+from src.ui.mindmap import dot
 from src.ui.versions import ALL, SUMMARY, describe
 
 st.set_page_config(page_title="LangChain 마이그레이션 챗봇", page_icon=":material/sync_alt:", layout="wide")
@@ -99,45 +99,33 @@ convert_tab, compare_tab, about_tab = st.tabs(
 
 
 # ---------------------------------------------------------------- ① 시작: 버전 마인드맵
-def version_map():
-    rows = []
-    for v in SUMMARY["versions"]:
-        for a in v["areas"]:
-            rows.append({"root": "LangChain", "version": v["version"], "area": a["name"], "count": a["total"]})
-    fig = px.sunburst(rows, path=["root", "version", "area"], values="count", color="version",
-                      color_discrete_sequence=px.colors.qualitative.Set2)
-    fig.update_traces(hovertemplate="%{label}<br>기능 %{value:,}개<extra></extra>", insidetextorientation="radial")
-    fig.update_layout(margin=dict(t=8, l=8, r=8, b=8), height=430)
-    return fig
-
-
 def start_screen():
     st.subheader("어떤 버전의 LangChain 코드를 바꾸시나요?", divider="blue")
-    left, right = st.columns([1.2, 1], gap="large")
+    choice = st.pills("옛 버전", [*ALL, AUTO], key="pick", label_visibility="collapsed")
+    with st.container(border=True):
+        st.graphviz_chart(dot(None if choice == AUTO else choice, auto=choice == AUTO), width="stretch")
+        st.caption("LangChain → 옛 버전 → 영역. 버전을 고르면 그 버전의 영역 가지가 펼쳐집니다. "
+                   "막대 색: 초록 = 1.x 최신 위치로 이사, 주황 = 옛 창고(classic), 회색 = 못 찾음 · 숫자는 2번 import 대응표 기준")
+    if not choice:
+        st.info("위에서 옛 버전을 골라 주세요. 모르면 \"모르겠어요 (자동 감지)\"를 고르면 코드를 보고 짐작해 드려요.",
+                icon=":material/touch_app:")
+        return
+    info = next((v for v in SUMMARY["versions"] if v["version"] == choice), None)
+    left, right = st.columns([3, 1], vertical_alignment="center")
     with left:
-        st.plotly_chart(version_map(), width="stretch", config={"displayModeBar": False})
-        st.caption("가운데에서 바깥으로: LangChain → 옛 버전 → 영역(chains, agents …). 조각을 누르면 확대됩니다. "
-                   f"숫자는 2번 import 대응표 기준.")
-    with right:
-        st.markdown("**옛 버전 고르기**")
-        choice = st.pills("옛 버전", [*ALL, AUTO], label_visibility="collapsed", key="pick")
-        if choice:
-            info = next((v for v in SUMMARY["versions"] if v["version"] == choice), None)
-            if info:
-                k = info["kinds"]
-                with st.container(border=True):
-                    st.markdown(f"**LangChain {choice}** 의 기능 **{info['total']:,}개**가 1.x에서 이렇게 바뀌어요")
-                    c1, c2, c3 = st.columns(3)
-                    c1.metric("최신 위치로 이사", f"{k.get('native', 0):,}")
-                    c2.metric("옛 창고(classic)", f"{k.get('classic_fallback', 0):,}")
-                    c3.metric("못 찾음", f"{k.get('unresolved', 0):,}")
-                    st.caption("기능이 많은 영역: " + ", ".join(f"{a['name']} {a['total']:,}" for a in info["areas"][:4]))
-            else:
-                st.info("코드를 넣으면 어느 버전 시기의 코드인지 짐작해서 알려 드려요.", icon=":material/search:")
-            if st.button("다음: 목표 버전 확인", type="primary", icon=":material/arrow_forward:"):
-                ss["source"] = None if choice == AUTO else choice
-                go("confirm")
-                st.rerun()
+        if info:
+            k = info["kinds"]
+            c0, c1, c2, c3 = st.columns(4)
+            c0.metric("기능 수", f"{info['total']:,}")
+            c1.metric("최신 위치로 이사", f"{k.get('native', 0):,}")
+            c2.metric("옛 창고(classic)", f"{k.get('classic_fallback', 0):,}")
+            c3.metric("못 찾음", f"{k.get('unresolved', 0):,}")
+        else:
+            st.info("코드를 넣으면 어느 버전 시기의 코드인지 짐작해서 알려 드려요.", icon=":material/search:")
+    if right.button("다음: 목표 버전 확인", type="primary", icon=":material/arrow_forward:", width="stretch"):
+        ss["source"] = None if choice == AUTO else choice
+        go("confirm")
+        st.rerun()
 
 
 # ---------------------------------------------------------------- ② 목표 버전 확인
