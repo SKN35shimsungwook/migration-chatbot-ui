@@ -1,7 +1,7 @@
 """시작 화면의 버전 마인드맵 (graphviz).
 
 LangChain(위) → 옛 버전(한 줄) → 고른 버전의 영역(아래) 순서의 나무 모양으로 그린다.
-graphviz 그림은 클릭이 안 되므로, 화면의 버전 버튼으로 고르면 그 버전이 강조되고 가지가 펼쳐진다.
+버전 상자에는 링크(?v=버전)를 걸어서, 누르면 app.py 가 그 값을 읽어 고른 버전으로 삼는다 (버튼으로 골라도 됨).
 색: 초록 = 최신 위치로 이사(native), 주황 = 옛 창고(classic), 회색 = 못 찾음(unresolved)
 """
 
@@ -54,7 +54,8 @@ def dot(selected: str | None, auto: bool = False) -> str:
     for v in SUMMARY["versions"]:
         on = v["version"] == selected
         nid = "v" + v["version"].replace(".", "_")
-        lines.append(f'{nid} [label={_ver_label(v, on)}, fillcolor="{SOFT["ver_on"] if on else SOFT["ver"]}", '
+        lines.append(f'{nid} [label={_ver_label(v, on)}, URL="?v={v["version"]}", target="_self", tooltip="{v["version"]} 고르기", '
+                     f'fillcolor="{SOFT["ver_on"] if on else SOFT["ver"]}", '
                      f'color="{ORANGE if on else "#C9D2DD"}", penwidth={3 if on else 1.2}];')
         lines.append(f'root -> {nid} [color="{ORANGE if on else "#9AA5B4"}", penwidth={2.6 if on else 1.3}];')
         if on:
@@ -63,7 +64,7 @@ def dot(selected: str | None, auto: bool = False) -> str:
                 aid = f"{nid}_a{i}"
                 lines.append(f'{aid} [label={_area_label(a)}, fillcolor="{SOFT["area"]}"];')
                 lines.append(f'{nid} -> {aid};')
-    lines.append(f'auto [label=<<FONT POINT-SIZE="18"><B>모르겠어요</B></FONT><BR/><BR/><FONT POINT-SIZE="13">자동 감지</FONT>>, margin="0.3,0.15", '
+    lines.append(f'auto [label=<<FONT POINT-SIZE="18"><B>모르겠어요</B></FONT><BR/><BR/><FONT POINT-SIZE="13">자동 감지</FONT>>, margin="0.3,0.15", URL="?v=auto", target="_self", tooltip="자동 감지 고르기", '
                  f'fillcolor="{SOFT["ver_on"] if auto else SOFT["auto"]}", style="rounded,filled,dashed", '
                  f'color="{ORANGE if auto else "#9AA5B4"}", penwidth={3 if auto else 1.2}];')
     lines.append(f'root -> auto [style=dashed, color="{ORANGE if auto else "#9AA5B4"}"];')

@@ -101,13 +101,18 @@ convert_tab, compare_tab, about_tab = st.tabs(
 # ---------------------------------------------------------------- ① 시작: 버전 마인드맵
 def start_screen():
     st.subheader("어떤 버전의 LangChain 코드를 바꾸시나요?", divider="blue")
+    clicked = st.query_params.get("v")          # 마인드맵 상자를 누르면 ?v=버전 으로 들어옴
+    if clicked:
+        if clicked == "auto" or clicked in ALL:
+            ss["pick"] = AUTO if clicked == "auto" else clicked
+        del st.query_params["v"]
     choice = st.pills("옛 버전", [*ALL, AUTO], key="pick", label_visibility="collapsed")
     with st.container(border=True):
         st.graphviz_chart(dot(None if choice == AUTO else choice, auto=choice == AUTO), width="stretch")
-        st.caption("LangChain → 옛 버전 → 영역. 버전을 고르면 그 버전의 영역 가지가 펼쳐집니다. "
+        st.caption("LangChain → 옛 버전 → 영역. **버전 상자를 누르면** 그 버전의 영역 가지가 펼쳐집니다 (위 버튼으로 골라도 됨). "
                    "막대 색: 초록 = 1.x 최신 위치로 이사, 주황 = 옛 창고(classic), 회색 = 못 찾음 · 숫자는 2번 import 대응표 기준")
     if not choice:
-        st.info("위에서 옛 버전을 골라 주세요. 모르면 \"모르겠어요 (자동 감지)\"를 고르면 코드를 보고 짐작해 드려요.",
+        st.info("마인드맵의 버전 상자를 눌러 주세요. 모르면 \"모르겠어요 (자동 감지)\"를 고르면 코드를 보고 짐작해 드려요.",
                 icon=":material/touch_app:")
         return
     info = next((v for v in SUMMARY["versions"] if v["version"] == choice), None)
