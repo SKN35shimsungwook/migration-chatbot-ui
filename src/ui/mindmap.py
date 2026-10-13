@@ -1,74 +1,74 @@
-"""시작 화면의 버전 마인드맵 (graphviz).
+"""시작 화면의 버전 마인드맵 (streamlit-agraph, 클릭 가능).
 
-LangChain(위) → 옛 버전(한 줄) → 고른 버전의 영역(아래) 순서의 나무 모양으로 그린다.
-버전 상자에는 링크(?v=버전)를 걸어서, 누르면 app.py 가 그 값을 읽어 고른 버전으로 삼는다 (버튼으로 골라도 됨).
-색: 초록 = 최신 위치로 이사(native), 주황 = 옛 창고(classic), 회색 = 못 찾음(unresolved)
+LangChain(위) → 옛 버전(한 줄) → 고른 버전의 영역(아래) 순서의 나무 모양.
+버전 상자를 클릭하면 agraph 가 그 상자의 id 를 돌려주고, app.py 가 고른 버전으로 삼는다 (새로고침 없음).
+상자 글자: 기능 수와 1.x에서 최신 위치 / 옛 창고(classic) 비율
 """
+
+from streamlit_agraph import Config, Edge, Node
 
 from .versions import SUMMARY
 
-INK = "#18202B"
-GREEN, ORANGE, GRAY = "#1B7A43", "#B8501F", "#6B7686"
-SOFT = {"root": "#2457C5", "ver": "#E4ECFB", "ver_on": "#FFE7C2", "auto": "#F1F3F6", "area": "#FFFFFF"}
+INK, GREEN, ORANGE, BLUE = "#18202B", "#1B7A43", "#B8501F", "#2457C5"
+AUTO_ID = "auto"
 
 
-def _bar(kinds: dict, width: int = 120) -> str:
-    """최신 · classic · 못 찾음 비율 막대 (HTML 표 칸 너비로)."""
+def _color(bg: str, border: str) -> dict:
+    return {"background": bg, "border": border,
+            "highlight": {"background": bg, "border": ORANGE}, "hover": {"background": bg, "border": ORANGE}}
+
+
+def _box(nid: str, label: str, bg: str, border: str, size: int, font_color: str = INK, width: int = 1, **kw) -> Node:
+    return Node(id=nid, label=label, shape="box", color=_color(bg, border), borderWidth=width,
+                borderWidthSelected=width, margin=12, shapeProperties={"borderRadius": 8},
+                font={"size": size, "color": font_color, "face": "Malgun Gothic, Noto Sans KR, sans-serif",
+                      "multi": "html", "bold": {"size": size + 4}}, **kw)
+
+
+def _share(kinds: dict) -> str:
     total = sum(kinds.values()) or 1
-    cells = []
-    for key, color in (("native", GREEN), ("classic_fallback", ORANGE), ("unresolved", GRAY)):
-        w = round(width * kinds.get(key, 0) / total)
-        if w:
-            cells.append(f'<TD BGCOLOR="{color}" WIDTH="{w}" HEIGHT="6" FIXEDSIZE="TRUE"></TD>')
-    return f'<TABLE BORDER="0" CELLSPACING="0" CELLPADDING="0"><TR>{"".join(cells)}</TR></TABLE>'
+    return (f"최신 {kinds.get('native', 0) * 100 // total}% · "
+            f"classic {kinds.get('classic_fallback', 0) * 100 // total}%")
 
 
-def _ver_label(v: dict, on: bool) -> str:
-    return (f'<<TABLE BORDER="0" CELLSPACING="3" CELLPADDING="0">'
-            f'<TR><TD><FONT POINT-SIZE="22"><B>{v["version"]}</B></FONT></TD></TR>'
-            f'<TR><TD><FONT POINT-SIZE="14" COLOR="{INK}">기능 {v["total"]:,}</FONT></TD></TR>'
-            f'<TR><TD>{_bar(v["kinds"], 110)}</TD></TR>'
-            f'</TABLE>>')
-
-
-def _area_label(a: dict) -> str:
-    return (f'<<TABLE BORDER="0" CELLSPACING="3" CELLPADDING="0">'
-            f'<TR><TD><FONT POINT-SIZE="17"><B>{a["name"]}</B></FONT></TD></TR>'
-            f'<TR><TD><FONT POINT-SIZE="14" COLOR="{INK}">{a["total"]:,}</FONT></TD></TR>'
-            f'<TR><TD>{_bar(a["kinds"], 90)}</TD></TR></TABLE>>')
-
-
-def dot(selected: str | None, auto: bool = False) -> str:
-    """graphviz DOT 문자열. selected: 고른 옛 버전, auto: 자동 감지를 골랐는지."""
-    lines = [
-        "digraph G {",
-        'rankdir=TB; bgcolor="transparent"; nodesep=0.22; ranksep=0.5; pad=0.35;',
-        f'node [shape=box, style="rounded,filled", fontname="Malgun Gothic", color="#C9D2DD", fontcolor="{INK}", penwidth=1.2, margin="0.22,0.12"];',
-        'edge [color="#9AA5B4", arrowsize=0.6, penwidth=1.3];',
-        f'root [label=<<FONT POINT-SIZE="24"><B>LangChain</B></FONT><BR/><BR/><FONT POINT-SIZE="14">옛 코드</FONT>>, '
-        f'fillcolor="{SOFT["root"]}", fontcolor="white", color="#2457C5", margin="0.3,0.12"];',
-    ]
-    if selected or auto:   # 고른 뒤에만 목표 버전 노드를 보여 준다
-        lines.append(f'target [label=<<FONT POINT-SIZE="20"><B>LangChain 1.x</B></FONT><BR/><BR/><FONT POINT-SIZE="14">최신 {SUMMARY["latest"]["langchain"]}</FONT>>, '
-                     f'fillcolor="{GREEN}", fontcolor="white", color="{GREEN}", margin="0.25,0.1"];')
+def graph(selected: str | None, auto: bool = False) -> tuple[list[Node], list[Edge], Config]:
+    nodes = [_box("root", "<b>LangChain</b>\n옛 코드", BLUE, BLUE, 16, "#FFFFFF", title="옛 버전을 골라 주세요")]
+    edges = []
     for v in SUMMARY["versions"]:
         on = v["version"] == selected
-        nid = "v" + v["version"].replace(".", "_")
-        lines.append(f'{nid} [label={_ver_label(v, on)}, URL="?v={v["version"]}", target="_self", tooltip="{v["version"]} 고르기", '
-                     f'fillcolor="{SOFT["ver_on"] if on else SOFT["ver"]}", '
-                     f'color="{ORANGE if on else "#C9D2DD"}", penwidth={3 if on else 1.2}];')
-        lines.append(f'root -> {nid} [color="{ORANGE if on else "#9AA5B4"}", penwidth={2.6 if on else 1.3}];')
+        nid = v["version"]
+        nodes.append(_box(nid, f"<b>{nid}</b>\n기능 {v['total']:,}\n{_share(v['kinds'])}",
+                          "#FFE7C2" if on else "#E4ECFB", ORANGE if on else "#C9D2DD", 14,
+                          width=3 if on else 1, title=f"LangChain {nid} 고르기"))
+        edges.append(Edge("root", nid, color=ORANGE if on else "#9AA5B4", width=3 if on else 1))
         if on:
-            lines.append(f'{nid} -> target [style=dashed, color="{GREEN}", penwidth=2, label=" 변환", fontname="Malgun Gothic", fontcolor="{GREEN}", fontsize=15];')
-            for i, a in enumerate(v["areas"][:6]):
-                aid = f"{nid}_a{i}"
-                lines.append(f'{aid} [label={_area_label(a)}, fillcolor="{SOFT["area"]}"];')
-                lines.append(f'{nid} -> {aid};')
-    lines.append(f'auto [label=<<FONT POINT-SIZE="18"><B>모르겠어요</B></FONT><BR/><BR/><FONT POINT-SIZE="13">자동 감지</FONT>>, margin="0.3,0.15", URL="?v=auto", target="_self", tooltip="자동 감지 고르기", '
-                 f'fillcolor="{SOFT["ver_on"] if auto else SOFT["auto"]}", style="rounded,filled,dashed", '
-                 f'color="{ORANGE if auto else "#9AA5B4"}", penwidth={3 if auto else 1.2}];')
-    lines.append(f'root -> auto [style=dashed, color="{ORANGE if auto else "#9AA5B4"}"];')
-    if auto:
-        lines.append(f'auto -> target [style=dashed, color="{GREEN}", penwidth=2];')
-    lines.append("}")
-    return "\n".join(lines)
+            for a in v["areas"][:6]:
+                aid = f"{nid}/{a['name']}"
+                nodes.append(_box(aid, f"<b>{a['name']}</b>\n{a['total']:,}\n{_share(a['kinds'])}",
+                                  "#FFFFFF", "#C9D2DD", 12, title=f"{a['name']} 영역 기능 {a['total']:,}개"))
+                edges.append(Edge(nid, aid, color="#9AA5B4"))
+    nodes.append(_box(AUTO_ID, "<b>모르겠어요</b>\n자동 감지", "#FFE7C2" if auto else "#F1F3F6",
+                      ORANGE if auto else "#9AA5B4", 14, width=3 if auto else 1, title="코드를 보고 버전 짐작하기"))
+    edges.append(Edge("root", AUTO_ID, color=ORANGE if auto else "#9AA5B4", dashes=True, width=3 if auto else 1))
+    if selected or auto:
+        nodes.append(_box("target", f"<b>LangChain 1.x</b>\n최신 {SUMMARY['latest']['langchain']}",
+                          GREEN, GREEN, 15, "#FFFFFF", title="목표 버전"))
+        edges.append(Edge(selected or AUTO_ID, "target", color=GREEN, dashes=True, width=2, label="변환",
+                          font={"color": GREEN, "size": 13, "strokeWidth": 0}))
+    config = Config(height=470 if (selected or auto) else 300, width=1000, directed=True, physics=False,
+                    hierarchical=True, direction="UD", sortMethod="directed", levelSeparation=120,
+                    nodeSpacing=185, treeSpacing=140,
+                    interaction={"dragNodes": False, "dragView": False, "zoomView": False, "hover": True,
+                                 "selectConnectedEdges": False})
+    config.width = "100%"    # 화면 폭에 맞춤 (Config 는 px 로만 받으므로 직접 바꿈)
+    return nodes, edges, config
+
+
+def clicked_version(node_id: str | None) -> str | None:
+    """클릭한 상자 id → 옛 버전 (영역 상자를 누르면 그 영역의 버전). 버전이 아니면 None."""
+    if not node_id:
+        return None
+    if node_id == AUTO_ID:
+        return AUTO_ID
+    version = node_id.split("/")[0]
+    return version if any(v["version"] == version for v in SUMMARY["versions"]) else None

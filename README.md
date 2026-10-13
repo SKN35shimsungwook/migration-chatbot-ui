@@ -14,9 +14,7 @@
    "고르신 버전과 다를 수 있어요"(단서와 함께) 안내 + 변환 결과
 ```
 
-![버전 마인드맵 (0.1.20을 고른 모습)](docs/images/mindmap_dark.png)
-
-마인드맵은 graphviz로 그린 나무 구조입니다 (LangChain → 옛 버전 → 고른 버전의 영역, 옆에 목표 버전). **버전 상자를 클릭하면** 그 버전이 강조되고 가지가 펼쳐집니다 (위쪽 버전 버튼으로 골라도 됨). 클릭은 상자에 건 링크(`?v=버전`)로 받아서, 고른 뒤 주소에서 바로 지웁니다. 막대 색: 초록 = 1.x 최신 위치, 주황 = 옛 창고(classic), 회색 = 못 찾음.
+마인드맵은 **streamlit-agraph**(클릭되는 그래프 부품)로 그린 나무 구조입니다: LangChain → 옛 버전 → 고른 버전의 영역, 옆에 목표 버전 1.x. **버전 상자를 클릭하면 페이지 새로고침 없이** 그 버전이 강조되고 가지가 펼쳐집니다 (아래 버튼으로 골라도 됨). 상자 글자는 기능 수와 1.x에서 최신 위치 / 옛 창고(classic) 비율입니다.
 
 옛 버전 목록(0.0.300 · 0.0.354 · 0.1.20 · 0.2.17 · 0.3.30)과 숫자는 2번 import 대응표를 센 요약(`src/ui/version_summary.json`)입니다. 자동 감지는 대응표의 "그 기능이 있던 버전"을 겹쳐 보는 방식이라 **범위**로 알려 줍니다. 팀 저장소에 `data/processed/import_map.jsonl`이 있으면 그것을 씁니다.
 
@@ -46,7 +44,7 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
-팀 저장소에서는 1번과 상의한 뒤 `uv add streamlit` → `uv run streamlit run app.py`.
+팀 저장소에서는 1번과 상의한 뒤 `uv add streamlit streamlit-agraph` → `uv run streamlit run app.py`.
 
 ## 폴더 (팀 저장소와 같은 구조)
 
@@ -57,7 +55,7 @@ streamlit run app.py
 │   │   ├── client.py   ← 챗봇을 부르는 단 한 곳 (지금은 가짜 결과)
 │   │   ├── mock.py     ← 가짜 결과 + 2번 대응표 근거 찾기
 │   │   ├── versions.py ← 버전 요약 · 자동 감지
-│   │   ├── mindmap.py  ← 시작 화면 마인드맵 (graphviz)
+│   │   ├── mindmap.py  ← 시작 화면 마인드맵 (streamlit-agraph, 클릭)
 │   │   └── version_summary.json ← 2번 대응표의 버전 · 영역별 숫자 요약
 │   ├── agents/  graph/  prompt/  rag/   (빈 자리: 1 · 2 · 3번 몫)
 ├── data/               (빈 자리: 2번 몫)

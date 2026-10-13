@@ -1,7 +1,7 @@
 """LangChain 마이그레이션 챗봇 화면 (4번 화면 · 평가).
 
 실행 (프로젝트 루트에서):
-    uv add streamlit          # 팀 저장소에서는 1번과 상의 후
+    uv add streamlit streamlit-agraph   # 팀 저장소에서는 1번과 상의 후
     uv run streamlit run app.py
 
 흐름: ① 시작 화면(버전 마인드맵에서 옛 버전 고르기, 모르면 자동 감지)
@@ -14,9 +14,10 @@ import difflib
 import time
 
 import streamlit as st
+from streamlit_agraph import agraph
 
 from src.ui.client import LATEST, TARGET_VERSIONS, mode, run
-from src.ui.mindmap import dot
+from src.ui.mindmap import AUTO_ID, clicked_version, graph
 from src.ui.versions import ALL, SUMMARY, describe
 
 st.set_page_config(page_title="LangChain 마이그레이션 챗봇", page_icon=":material/sync_alt:", layout="wide")
@@ -101,18 +102,20 @@ convert_tab, compare_tab, about_tab = st.tabs(
 # ---------------------------------------------------------------- ① 시작: 버전 마인드맵
 def start_screen():
     st.subheader("어떤 버전의 LangChain 코드를 바꾸시나요?", divider="blue")
-    clicked = st.query_params.get("v")          # 마인드맵 상자를 누르면 ?v=버전 으로 들어옴
-    if clicked:
-        if clicked == "auto" or clicked in ALL:
-            ss["pick"] = AUTO if clicked == "auto" else clicked
-        del st.query_params["v"]
-    choice = st.pills("옛 버전", [*ALL, AUTO], key="pick", label_visibility="collapsed")
+    current = ss.get("pick")
+    nodes, edges, config = graph(None if current in (None, AUTO) else current, auto=current == AUTO)
     with st.container(border=True):
-        st.graphviz_chart(dot(None if choice == AUTO else choice, auto=choice == AUTO), width="stretch")
-        st.caption("LangChain → 옛 버전 → 영역. **버전 상자를 누르면** 그 버전의 영역 가지가 펼쳐집니다 (위 버튼으로 골라도 됨). "
-                   "막대 색: 초록 = 1.x 최신 위치로 이사, 주황 = 옛 창고(classic), 회색 = 못 찾음 · 숫자는 2번 import 대응표 기준")
+        got = agraph(nodes, edges, config)          # 상자를 클릭하면 그 상자의 id
+        st.caption("**버전 상자를 클릭하세요.** 고른 버전 아래로 영역 가지가 펼쳐집니다. "
+                   "글자: 기능 수, 1.x에서 최신 위치 / 옛 창고(classic) 비율 · 숫자는 2번 import 대응표 기준")
+    picked = clicked_version(got)
+    if picked and got != ss.get("last_click"):
+        ss["last_click"] = got
+        ss["pick"] = AUTO if picked == AUTO_ID else picked
+        st.rerun()
+    choice = st.pills("또는 버튼으로 고르기", [*ALL, AUTO], key="pick")
     if not choice:
-        st.info("마인드맵의 버전 상자를 눌러 주세요. 모르면 \"모르겠어요 (자동 감지)\"를 고르면 코드를 보고 짐작해 드려요.",
+        st.info("마인드맵의 버전 상자를 눌러 주세요. 모르면 \"모르겠어요\" 상자를 누르면 코드를 보고 짐작해 드려요.",
                 icon=":material/touch_app:")
         return
     info = next((v for v in SUMMARY["versions"] if v["version"] == choice), None)
