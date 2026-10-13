@@ -103,15 +103,19 @@ def fake_rewrite(code: str, evidences: list[dict]) -> str:
 def run_mock(code: str, target_version: str) -> dict:
     """화면이 기대하는 결과 모양 (docs/화면_결과_모양.md)."""
     evidences = []
-    for line, path in import_paths(code):
+    paths = import_paths(code)
+    for line, path in paths:
         ev = find_evidence(path)
         if ev:
             ev["line"] = line
             evidences.append(ev)
     if not evidences:
+        message = ("LangChain import 줄을 찾지 못했습니다. 옛 LangChain 코드를 넣어 주세요." if not paths else
+                   f"LangChain import {len(paths)}줄을 찾았지만 대응표에서 근거를 찾지 못했어요. "
+                   "(지금은 예시 대응표라 일부만 있어요. 팀 저장소에서는 2번 대응표 전체를 씁니다.)")
         return {"target_version": target_version, "original_code": code, "migrated_code": code,
-                "changes": [], "steps": _steps(0, ok=False), "verification": {"success": False, "attempts": 0,
-                "message": "LangChain import 줄을 찾지 못했습니다. 옛 LangChain 코드를 넣어 주세요."}, "mode": "mock"}
+                "changes": [], "steps": _steps(len(paths), ok=False),
+                "verification": {"success": False, "attempts": 0, "message": message}, "mode": "mock"}
     migrated = fake_rewrite(code, evidences)
     changes = [{"old": ev["line"], "new": replacement_line(ev) or "-",
                 "kind": ev["kind"], "evidence_id": ev["evidence_id"], "source": ev["source"],

@@ -59,7 +59,7 @@ def graph(selected: str | None, auto: bool = False) -> tuple[list[Node], list[Ed
                     hierarchical=True, direction="UD", sortMethod="directed", levelSeparation=120,
                     nodeSpacing=185, treeSpacing=140,
                     interaction={"dragNodes": False, "dragView": True, "zoomView": True, "hover": True,
-                                 "navigationButtons": True, "keyboard": False, "zoomSpeed": 0.6,
+                                 "keyboard": False, "zoomSpeed": 0.6,
                                  "selectConnectedEdges": False})
     config.width = "100%"    # 화면 폭에 맞춤 (Config 는 px 로만 받으므로 직접 바꿈)
     return nodes, edges, config

@@ -107,7 +107,7 @@ def start_screen():
     with st.container(border=True):
         got = agraph(nodes, edges, config)          # 상자를 클릭하면 그 상자의 id
         st.caption("**버전 상자를 클릭하세요.** 고른 버전 아래로 영역 가지가 펼쳐집니다. "
-                   "마우스 휠로 확대 · 축소, 빈 곳을 끌어서 이동, 오른쪽 아래 버튼으로도 조절할 수 있어요. "
+                   "마우스 휠로 확대 · 축소, 빈 곳을 끌어서 이동할 수 있어요. "
                    "글자: 기능 수, 1.x에서 최신 위치 / 옛 창고(classic) 비율 · 숫자는 2번 import 대응표 기준")
     picked = clicked_version(got)
     if picked and got != ss.get("last_click"):
