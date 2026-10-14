@@ -4,3 +4,4 @@ __pycache__/
 .env
 .streamlit/secrets.toml
 data/local_chat.db
+data/local_chat_history.db
