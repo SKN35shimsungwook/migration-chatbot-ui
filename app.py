@@ -24,14 +24,16 @@ import streamlit as st
 from src.ui import db, llm
 from src.ui.client import LATEST, TARGET_VERSIONS, mode, run
 from src.ui.mock import import_paths
-from src.ui.versions import ALL, describe
+from src.ui.versions import ALL_WITH_NEW, describe
 
 st.set_page_config(page_title="LangChain 마이그레이션 어시스턴트", page_icon=":material/sync_alt:", layout="wide")
 
 APP_NAME = "LangChain 버전 마이그레이션 코드 어시스턴트"
 QUESTIONS = json.loads((Path(__file__).parent / "eval" / "questions.json").read_text(encoding="utf-8"))
 AUTO = "자동 감지"
-KIND_LABEL = {"native": "최신 위치", "classic_fallback": "옛 창고(classic)", "unresolved": "못 찾음"}
+KIND_LABEL = {"native": "최신 위치", "moved": "위치 이동", "same": "그대로", "classic_fallback": "옛 창고(classic)",
+              "unresolved": "못 찾음"}
+ORDER = ALL_WITH_NEW
 USERNAME_RULE = re.compile(r"^[0-9A-Za-z가-힣_]{2,20}$")
 
 ss = st.session_state
@@ -52,6 +54,13 @@ def open_chat(conv_id: int) -> None:
     ss["conv_id"], ss["followups"] = conv_id, []
     ss["messages"] = [{"role": m["role"], "content": m["content"], "result": m["result"]}
                       for m in db.get_messages(conv_id, ss["user"]["user_id"])]
+
+
+def use_starter(q: dict) -> None:
+    """예시 질문: 질문의 버전으로 맞추고 보낸다 (위젯이 그려지기 전에 실행되는 콜백)."""
+    ss["source_pick"] = q["source_version"] if q["source_version"] in ALL_WITH_NEW else AUTO
+    ss["target_pick"] = q.get("target_version", "1.x")
+    ss["pending"] = f"{q['request']}\n\n```python\n{q['code']}```"
 
 
 def logout() -> None:
@@ -77,6 +86,8 @@ def summary(result: dict) -> str:
     if not v["success"]:
         return v["message"]
     changes = result["changes"]
+    if not changes:
+        return f"바꿀 import가 없어요. 쓰인 기능이 LangChain {result['target_version']}에도 그대로 있어요."
     classic = [c for c in changes if c["kind"] == "classic_fallback"]
     lcel = [c for c in classic if "StrOutputParser" in c["new"]]
     missing = [c for c in changes if c["kind"] == "unresolved"]
@@ -86,8 +97,11 @@ def summary(result: dict) -> str:
     if len(classic) > len(lcel):
         extra += f" {len(classic) - len(lcel)}개는 옛 창고(classic) 위치와 대안을 같이 안내해요."
     if missing:
-        extra += f" {len(missing)}개는 1.x에서 옮길 곳을 찾지 못했어요."
-    return (f"import {len(changes)}줄을 찾아 고쳤어요.{extra} 검증은 {v['attempts']}회 만에 통과했어요. "
+        extra += f" {len(missing)}개는 {result['target_version']}에 같은 기능이 없어서 그대로 두었어요."
+    src = result["source_version"] or (result["detected"]["candidates"] or [None])[-1]
+    back = src in ORDER and ORDER.index(result["target_version"]) < ORDER.index(src)
+    head = f"LangChain {result['target_version']}로 되돌리면서 " if back else ""
+    return (f"{head}import {len(changes)}줄을 찾아 고쳤어요.{extra} 검증은 {v['attempts']}회 만에 통과했어요. "
             "오른쪽에서 자세히 보세요.")
 
 
@@ -208,7 +222,7 @@ def handle(text: str, source: str | None, target: str) -> None:
     result = None
     if import_paths(code):
         result = run(code, target, source)
-        note = version_note(result) if result["changes"] else None
+        note = version_note(result) if result["verification"]["success"] else None
         reply = (note + "\n\n" if note else "") + summary(result)
     else:
         reply = llm.answer(text, ss["messages"][:-1])
@@ -220,10 +234,14 @@ def handle(text: str, source: str | None, target: str) -> None:
 def chat_screen() -> None:
     head, ver_src, ver_tgt = st.columns([2.2, 1, 1], vertical_alignment="bottom")
     head.markdown(f"#### {APP_NAME}")
-    source = ver_src.selectbox("옛 버전", [AUTO, *ALL], key="source_pick")
+    source = ver_src.selectbox("지금 코드 버전", [AUTO, *ALL_WITH_NEW], key="source_pick")
+    ss.setdefault("target_pick", TARGET_VERSIONS[-1])     # 기본은 최신(1.x)
     target = ver_tgt.selectbox("변환할 버전", TARGET_VERSIONS, key="target_pick",
-                               format_func=lambda v: f"LangChain {v} (최신 {LATEST['langchain']})")
+                               format_func=lambda v: f"LangChain {v} (최신 {LATEST['langchain']})" if v == "1.x"
+                               else f"LangChain {v}")
     source = None if source == AUTO else source
+    if source == target:
+        st.warning("지금 코드 버전과 변환할 버전이 같아요. 변환할 버전을 바꿔 주세요.", icon=":material/info:")
 
     chat_col, result_col = st.columns([1, 1.25], gap="large")
     with chat_col:
@@ -234,8 +252,8 @@ def chat_screen() -> None:
                     st.write("옛 LangChain 코드를 붙여 넣거나, 아래 예시 질문을 눌러 보세요. "
                              "버전을 모르면 자동으로 짐작해 드려요.")
                 for i, q in enumerate(ss["starters"]):
-                    if st.button(f"{q['type']} · {q['request'][:38]}", key=f"starter_{i}", width="stretch"):
-                        ss["pending"] = f"{q['request']}\n\n```python\n{q['code']}```"
+                    st.button(f"{q['type']} · {q['request'][:38]}", key=f"starter_{i}", width="stretch",
+                              on_click=use_starter, args=(q,))
             for m in ss["messages"]:
                 with st.chat_message(m["role"]):
                     st.markdown(as_markdown(m["content"]) if m["role"] == "user" else m["content"])

@@ -8,6 +8,8 @@
   3. 기대 결과(expected_imports)가 1.x 환경에서 전부 import 되는가
   4. (--map) 옛 코드의 LangChain import 경로가 2번 대응표에 있는가 (없는 것은 목록만 보여 줌)
   (--symbols) 1.x 환경에 패키지가 없어 import 가 안 되면, 2번의 버전별 도구 목록(data/raw/symbols)으로 경로를 확인
+  목표가 1.x 가 아닌 질문(버전 오가기)은 2번 도구 목록으로 정적 확인: 옛 경로 중 하나라도 목표 버전에 없는가,
+  기대 경로가 목표 버전에 모두 있는가 (--symbols 필요)
 """
 
 import argparse
@@ -47,6 +49,29 @@ def try_imports(py: str, lines: list[str]) -> dict[str, str | None]:
     return json.loads(out.stdout.strip().splitlines()[-1])
 
 
+def check_static(q: dict) -> int:
+    """목표가 0.x 인 질문: 2번 도구 목록으로 확인."""
+    from src.ui import version_map as vm
+    tgt = q["target_version"]
+    problems = []
+    if not vm.available():
+        problems.append("--symbols 가 없어서 확인 못 함")
+    else:
+        olds = old_paths(q["code"])
+        if all(vm.has(p, tgt) for p in olds):
+            problems.append(f"옛 코드가 {tgt}에서 바꿀 곳이 없음")
+        for line in q["expected_imports"]:
+            node = ast.parse(line).body[0]
+            for x in node.names:
+                if not vm.has(f"{node.module}.{x.name}", tgt):
+                    problems.append(f"기대 경로가 {tgt}에 없음: {node.module}.{x.name}")
+    print(f"[{'OK ' if not problems else 'BAD'}] {q['id']} {q['type']:<12} {q['difficulty']:<3}"
+          f" · {q['source_version']} → {tgt} (2번 도구 목록으로 확인)")
+    for p in problems:
+        print("      -", p)
+    return bool(problems)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--py", required=True)
@@ -58,13 +83,19 @@ def main() -> int:
     if a.map:
         known = {json.loads(l)["old"] for l in Path(a.map).read_text(encoding="utf-8").splitlines() if l.strip()}
 
-    all_lines = sorted({l for q in qs for l in import_lines(q["code"]) + q["expected_imports"]})
+    if a.symbols:
+        import os
+        os.environ["MIGRATION_SYMBOLS_DIR"] = a.symbols
+        sys.path.insert(0, str(HERE.parent))
+    other = [q for q in qs if q.get("target_version", "1.x") != "1.x"]
+    qs_new = [q for q in qs if q.get("target_version", "1.x") == "1.x"]
+    all_lines = sorted({l for q in qs_new for l in import_lines(q["code"]) + q["expected_imports"]})
     res = try_imports(a.py, all_lines)
     dumped = set()
     if a.symbols:
         for f in Path(a.symbols).glob("*.jsonl"):
             dumped |= {json.loads(l)["path"] for l in f.read_text(encoding="utf-8").splitlines() if l.strip()}
-    expected = {l for q in qs for l in q["expected_imports"]}
+    expected = {l for q in qs_new for l in q["expected_imports"]}
     for line, err in list(res.items()):
         # 기대 결과(1.x import)에만 쓴다. 도구 목록에는 옛 버전 목록도 있어서 옛 코드에 쓰면 안 됨
         if line in expected and err and err.startswith("ModuleNotFoundError") and dumped:
@@ -73,6 +104,9 @@ def main() -> int:
                 res[line] = None   # 패키지는 없지만 2번 도구 목록에 경로가 있음
     bad = 0
     for q in qs:
+        if q in other:
+            bad += check_static(q)
+            continue
         problems = []
         olds = import_lines(q["code"])
         if all(res[l] is None for l in olds):

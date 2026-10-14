@@ -8,10 +8,10 @@ from pathlib import Path
 Q = []
 
 
-def q(type_, difficulty, request, code, expected_imports, checks, source="unknown"):
+def q(type_, difficulty, request, code, expected_imports, checks, source="unknown", target="1.x"):
     Q.append({"id": f"q{len(Q) + 1:02d}", "type": type_, "difficulty": difficulty, "source_version": source,
-              "request": request, "code": code.strip("\n") + "\n", "expected_imports": expected_imports,
-              "checks": checks})
+              "target_version": target, "request": request, "code": code.strip("\n") + "\n",
+              "expected_imports": expected_imports, "checks": checks})
 
 
 # A. import 경로 이동
@@ -376,6 +376,80 @@ print(chain.run(docs))
 ''', ["from langchain_openai import ChatOpenAI", "from langchain_text_splitters import RecursiveCharacterTextSplitter",
       "from langchain_core.documents import Document"],
   ["못 바꾸는 부분 안내(unresolved) 또는 map-reduce 재구성"], "0.1.20")
+
+# K. 버전 오가기 (옛 버전으로 되돌리기 · 중간 버전까지만 · 없는 기능)
+q("버전 오가기", "중간", "운영 서버가 langchain 0.2에 고정돼 있어요. 1.x로 짠 이 코드를 0.2에서 돌게 되돌려 주세요.", '''
+from langchain_openai import ChatOpenAI
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+
+chunks = RecursiveCharacterTextSplitter(chunk_size=500).split_text(open("faq.txt", encoding="utf-8").read())
+prompt = ChatPromptTemplate.from_template("다음 FAQ를 요약해줘: {text}")
+chain = prompt | ChatOpenAI(temperature=0) | StrOutputParser()
+print(chain.invoke({"text": chunks[0]}))
+''', ["from langchain.chat_models import ChatOpenAI", "from langchain_core.prompts import ChatPromptTemplate",
+      "from langchain_core.output_parsers import StrOutputParser",
+      "from langchain.text_splitter import RecursiveCharacterTextSplitter"],
+  ["0.2에 없는 패키지 경로(langchain_openai · langchain_text_splitters) 되돌리기", "| 체인은 0.2에서도 그대로"],
+  "1.x", "0.2.17")
+q("버전 오가기", "어려움", "create_agent로 만든 에이전트인데, 고객사가 0.3을 써서 0.3에서 돌아가게 해 주세요. 안 되는 부분은 대안을 알려 주세요.", '''
+from langchain_openai import ChatOpenAI
+from langchain.agents import create_agent
+from langchain_core.tools import tool
+
+@tool
+def order_status(order_id: str) -> str:
+    """주문 상태 조회"""
+    return "배송 중"
+
+agent = create_agent(ChatOpenAI(model="gpt-4o-mini"), tools=[order_status], system_prompt="주문 도우미")
+print(agent.invoke({"messages": [{"role": "user", "content": "A-17 주문 어디야?"}]}))
+''', ["from langchain.chat_models import ChatOpenAI", "from langchain_core.tools import tool"],
+  ["create_agent는 0.3에 없음 → 못 바꿈 표시 + 대안(create_tool_calling_agent + AgentExecutor) 안내"],
+  "1.x", "0.3.30")
+q("버전 오가기", "중간", "1.x에서 langchain_classic으로 겨우 돌려 둔 에이전트 코드예요. 사내 표준이 0.1이라 0.1 방식으로 되돌려 주세요.", '''
+from langchain_openai import ChatOpenAI
+from langchain_classic.agents import AgentExecutor, create_tool_calling_agent
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+
+prompt = ChatPromptTemplate.from_messages([("system", "도우미"), ("human", "{input}"),
+                                           MessagesPlaceholder("agent_scratchpad")])
+agent = create_tool_calling_agent(ChatOpenAI(), [], prompt)
+print(AgentExecutor(agent=agent, tools=[]).invoke({"input": "안녕"}))
+''', ["from langchain.chat_models import ChatOpenAI", "from langchain.agents import AgentExecutor, create_tool_calling_agent",
+      "from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder"],
+  ["langchain_classic → langchain.agents 로 되돌리기"], "1.x", "0.1.20")
+q("버전 오가기", "중간", "0.3에서 init_chat_model로 모델을 고르게 해 뒀는데, 0.1 서버로 옮겨야 해요. 안 되는 게 있으면 바꿔 쓰는 방법도요.", '''
+from langchain.chat_models import init_chat_model
+from langchain_core.prompts import PromptTemplate
+
+llm = init_chat_model("gpt-4o-mini", model_provider="openai", temperature=0)
+prompt = PromptTemplate.from_template("{q}에 한 줄로 답해")
+print((prompt | llm).invoke({"q": "LCEL이 뭐야"}).content)
+''', ["from langchain_core.prompts import PromptTemplate"],
+  ["init_chat_model은 0.1에 없음 → 못 바꿈 표시 + 모델 클래스(ChatOpenAI) 직접 생성 안내"], "0.3.30", "0.1.20")
+q("버전 오가기", "어려움", "신입 교육 자료가 0.0.354 기준이라, 0.3 코드를 그 버전으로 맞춰야 해요.", '''
+from langchain.chat_models import ChatOpenAI
+from langchain.agents import AgentExecutor, create_tool_calling_agent
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+
+prompt = ChatPromptTemplate.from_messages([("human", "{input}"), MessagesPlaceholder("agent_scratchpad")])
+agent = create_tool_calling_agent(ChatOpenAI(), [], prompt)
+executor = AgentExecutor(agent=agent, tools=[])
+''', ["from langchain.chat_models import ChatOpenAI", "from langchain.agents import AgentExecutor",
+      "from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder"],
+  ["create_tool_calling_agent는 0.0.354에 없음 → 못 바꿈 표시 + 그 시기 방식(OpenAI functions 에이전트 등) 안내"],
+  "0.3.30", "0.0.354")
+q("버전 오가기", "중간", "0.0.300 코드인데 한 번에 1.x는 부담이라 일단 0.2까지만 올리고 싶어요. 0.2에서 안 되는 것만 알려 주세요.", '''
+from langchain.chat_models import ChatOpenAI
+from langchain.agents import create_csv_agent
+
+agent = create_csv_agent(ChatOpenAI(temperature=0), "sales.csv", verbose=True)
+print(agent.run("3월 매출 합계는?"))
+''', ["from langchain.chat_models import ChatOpenAI"],
+  ["create_csv_agent는 0.2에 없음(langchain_experimental 로 분리) → 못 바꿈 표시 + 설치 안내", "ChatOpenAI는 0.2에서도 그대로"],
+  "0.0.300", "0.2.17")
 
 if __name__ == "__main__":
     Path(__file__).with_name("questions.json").write_text(json.dumps(Q, ensure_ascii=False, indent=1), encoding="utf-8")

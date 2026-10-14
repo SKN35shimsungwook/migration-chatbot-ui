@@ -65,7 +65,8 @@ def login(at: AppTest, name: str) -> AppTest:
 
 def last_reply(at: AppTest) -> str:
     return next((m.value for m in reversed(at.markdown)
-                 if any(k in m.value for k in ("고쳤어요", "찾았지만", "찾지 못했", "키를 설정"))), "")
+                 if any(k in m.value for k in ("고쳤어요", "찾았지만", "찾지 못했", "키를 설정", "바꿀 import가 없어요",
+                                               "도구 목록", "그대로 두었어요"))), "")
 
 
 def main() -> int:
@@ -95,6 +96,36 @@ def main() -> int:
         else:
             check(f"{pick} + {code_name}", expect in reply, f"안내: {expect}" if expect in reply else reply[:80])
 
+    # 2-1. 버전 오가기 (변환할 버전 선택)
+    qs = {q["id"]: q for q in json.loads((ROOT / "eval" / "questions.json").read_text(encoding="utf-8"))}
+    hops = [("1.x", "0.2.17", "q31", "되돌리면서"), (AUTO, "0.3.30", "q32", "그대로 두었어요"),
+            (AUTO, "0.2.17", "q31", "LangChain 1.x** 코드로")]
+    for src, tgt, qid, expect in hops:
+        at = login(app(), "봇사용자")
+        at.selectbox(key="source_pick").set_value(src).run()
+        at.selectbox(key="target_pick").set_value(tgt).run()
+        at.chat_input[0].set_value(qs[qid]["code"]).run()
+        reply = " ".join(m.value for m in at.markdown)
+        ok = not at.exception and (expect in reply or not data)
+        check(f"버전 오가기 {src} → {tgt} ({qid})", ok, f"안내: {expect}" if expect in reply else
+              ("예시 데이터라 건너뜀" if not data else reply[-120:]))
+    at = login(app(), "봇사용자")
+    at.selectbox(key="source_pick").set_value("0.2.17").run()
+    at.selectbox(key="target_pick").set_value("0.2.17").run()
+    check("같은 버전 고르면 안내", any("버전이 같아요" in w.value for w in at.warning))
+
+    # 2-2. 질문 36개 전부 화면에서 실행 (오류 없이 답이 나오는가)
+    failed = []
+    for q in qs.values():
+        at = login(app(), "봇사용자")
+        src = q["source_version"] if q["source_version"] in at.selectbox(key="source_pick").options else AUTO
+        at.selectbox(key="source_pick").set_value(src).run()
+        at.selectbox(key="target_pick").set_value(q["target_version"]).run()
+        at.chat_input[0].set_value(q["request"] + "\n\n```python\n" + q["code"] + "```").run()
+        if at.exception or not last_reply(at):
+            failed.append(q["id"])
+    check(f"질문 {len(qs)}개 전부 실행", not failed, f"실패: {failed}" if failed else "오류 없음")
+
     # 3. 예시 질문 버튼 → 결과 패널
     at = login(app(), "봇사용자")
     at.button(key="starter_0").click().run()
@@ -107,7 +138,7 @@ def main() -> int:
     # 5. 대화 기록 다시 불러오기 (새 세션)
     at = login(app(), "봇사용자")
     convs = [b for b in at.sidebar.button if b.key and b.key.startswith("conv_")]
-    check("대화 목록 저장", len(convs) == len(VERSION_CASES) + 1, f"{len(convs)}개")
+    check("대화 목록 저장", len(convs) >= len(VERSION_CASES) + 1, f"{len(convs)}개")
     convs[0].click().run()
     restored = [m.value for m in at.markdown if "LCEL이 뭐야" in m.value]
     check("대화 다시 열기 (메시지 · 결과 복원)", bool(restored) and any("검증" in m.value for m in at.markdown))

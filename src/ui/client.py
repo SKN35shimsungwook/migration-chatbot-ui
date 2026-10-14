@@ -5,9 +5,9 @@
 """
 
 from .mock import run_mock
-from .versions import SUMMARY, detect
+from .versions import ALL_WITH_NEW, SUMMARY, detect
 
-TARGET_VERSIONS = SUMMARY["targets"]          # 지금 2번 대응표의 목표는 1.x 하나
+TARGET_VERSIONS = ALL_WITH_NEW               # 어느 버전으로든 (옛 버전으로 되돌리기 포함)
 LATEST = SUMMARY["latest"]                    # 예: {"langchain": "1.4.4", "langchain-core": "1.6.10"}
 
 
