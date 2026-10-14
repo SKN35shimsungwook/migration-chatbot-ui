@@ -144,9 +144,10 @@ def main() -> int:
     at.chat_input[0].set_value(COMMON).run()
     check("코드 붙여 넣기 → 결과 패널", not at.exception and any("검증" in m.value for m in at.markdown))
 
-    # 4. 코드 없는 질문 (키 없을 때 안내)
+    # 4. 코드 없는 질문 (followups 가 있으면 키 안내, 빼 두었으면 코드를 넣어 달라는 안내)
     at.chat_input[0].set_value("LCEL이 뭐야?").run()
-    check("코드 없는 질문 (키 없음 안내)", "키를 설정" in last_reply(at))
+    shown = " ".join(m.value for m in at.markdown)
+    check("코드 없는 질문 안내", not at.exception and ("키를 설정" in shown or "코드를 붙여 넣어 주세요" in shown))
 
     # 5. 대화 기록 다시 불러오기 (새 세션)
     at = login(app(), "봇사용자")
