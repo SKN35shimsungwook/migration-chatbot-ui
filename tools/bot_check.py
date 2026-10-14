@@ -17,6 +17,7 @@ DB_FILE = Path(tempfile.gettempdir()) / "migration_bot_check.db"
 DB_FILE.unlink(missing_ok=True)
 os.environ["MIGRATION_DB_URL"] = f"sqlite:///{DB_FILE.as_posix()}"
 os.environ.pop("OPENAI_API_KEY", None)          # LLM 호출 없이 점검
+os.environ["MIGRATION_NO_GRAPH"] = "1"          # 팀 그래프(유료 API) 없이 화면만 점검
 
 from streamlit.testing.v1 import AppTest  # noqa: E402
 
