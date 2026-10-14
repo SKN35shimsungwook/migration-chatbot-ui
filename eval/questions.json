@@ -152,25 +152,6 @@
   "difficulty": "중간",
   "source_version": "0.0.300",
   "target_version": "1.x",
-  "request": "LLMChain이 없어졌다는데 같은 동작으로 바꿔 주세요.",
-  "code": "from langchain.chat_models import ChatOpenAI\nfrom langchain.chains import LLMChain\nfrom langchain.prompts import PromptTemplate\n\nllm = ChatOpenAI(temperature=0)\nprompt = PromptTemplate.from_template(\"{product}을 만드는 회사 이름을 지어줘\")\nchain = LLMChain(llm=llm, prompt=prompt)\nprint(chain.run(product=\"양말\"))\n",
-  "expected_imports": [
-   "from langchain_openai import ChatOpenAI",
-   "from langchain_core.prompts import PromptTemplate",
-   "from langchain_core.output_parsers import StrOutputParser"
-  ],
-  "checks": [
-   "LLMChain 없음",
-   ".run( 없음 → invoke",
-   "문자열 반환 유지(StrOutputParser)"
-  ]
- },
- {
-  "id": "q11",
-  "type": "LLMChain → LCEL",
-  "difficulty": "중간",
-  "source_version": "0.0.300",
-  "target_version": "1.x",
   "request": "predict랑 apply 쓰는 옛날 체인이에요. 여러 입력을 한 번에 돌리는 부분도 살려 주세요.",
   "code": "from langchain.llms import OpenAI\nfrom langchain.chains import LLMChain\nfrom langchain.prompts import PromptTemplate\n\nchain = LLMChain(llm=OpenAI(temperature=0), prompt=PromptTemplate.from_template(\"{word}의 반대말은?\"))\nprint(chain.predict(word=\"크다\"))\nprint(chain.apply([{\"word\": \"빠르다\"}, {\"word\": \"높다\"}]))\n",
   "expected_imports": [
@@ -184,7 +165,7 @@
   ]
  },
  {
-  "id": "q12",
+  "id": "q11",
   "type": "LLMChain → LCEL",
   "difficulty": "중간",
   "source_version": "0.1.20",
@@ -201,7 +182,7 @@
   ]
  },
  {
-  "id": "q13",
+  "id": "q12",
   "type": "체인 조합",
   "difficulty": "중간",
   "source_version": "0.0.354",
@@ -218,7 +199,7 @@
   ]
  },
  {
-  "id": "q14",
+  "id": "q13",
   "type": "체인 조합",
   "difficulty": "어려움",
   "source_version": "0.2.17",
@@ -236,7 +217,7 @@
   ]
  },
  {
-  "id": "q15",
+  "id": "q14",
   "type": "체인 조합",
   "difficulty": "어려움",
   "source_version": "0.1.20",
@@ -253,7 +234,7 @@
   ]
  },
  {
-  "id": "q16",
+  "id": "q15",
   "type": "RAG",
   "difficulty": "중간",
   "source_version": "0.1.20",
@@ -271,7 +252,7 @@
   ]
  },
  {
-  "id": "q17",
+  "id": "q16",
   "type": "RAG",
   "difficulty": "어려움",
   "source_version": "0.2.17",
@@ -288,7 +269,7 @@
   ]
  },
  {
-  "id": "q18",
+  "id": "q17",
   "type": "RAG",
   "difficulty": "중간",
   "source_version": "0.1.20",
@@ -305,7 +286,7 @@
   ]
  },
  {
-  "id": "q19",
+  "id": "q18",
   "type": "메모리",
   "difficulty": "중간",
   "source_version": "0.0.300",
@@ -321,7 +302,7 @@
   ]
  },
  {
-  "id": "q20",
+  "id": "q19",
   "type": "메모리",
   "difficulty": "어려움",
   "source_version": "0.1.20",
@@ -337,7 +318,7 @@
   ]
  },
  {
-  "id": "q21",
+  "id": "q20",
   "type": "메모리",
   "difficulty": "중간",
   "source_version": "0.2.17",
@@ -353,7 +334,7 @@
   ]
  },
  {
-  "id": "q22",
+  "id": "q21",
   "type": "에이전트 · 도구",
   "difficulty": "어려움",
   "source_version": "0.0.300",
@@ -371,7 +352,7 @@
   ]
  },
  {
-  "id": "q23",
+  "id": "q22",
   "type": "에이전트 · 도구",
   "difficulty": "어려움",
   "source_version": "0.1.20",
@@ -389,7 +370,7 @@
   ]
  },
  {
-  "id": "q24",
+  "id": "q23",
   "type": "에이전트 · 도구",
   "difficulty": "어려움",
   "source_version": "0.2.17",
@@ -408,7 +389,7 @@
   ]
  },
  {
-  "id": "q25",
+  "id": "q24",
   "type": "출력 파서",
   "difficulty": "중간",
   "source_version": "0.1.20",
@@ -424,7 +405,7 @@
   ]
  },
  {
-  "id": "q26",
+  "id": "q25",
   "type": "출력 파서",
   "difficulty": "중간",
   "source_version": "0.2.17",
@@ -440,7 +421,7 @@
   ]
  },
  {
-  "id": "q27",
+  "id": "q26",
   "type": "출력 파서",
   "difficulty": "쉬움",
   "source_version": "0.1.20",
@@ -456,7 +437,7 @@
   ]
  },
  {
-  "id": "q28",
+  "id": "q27",
   "type": "실무 상황",
   "difficulty": "중간",
   "source_version": "0.1.20",
@@ -473,7 +454,7 @@
   ]
  },
  {
-  "id": "q29",
+  "id": "q28",
   "type": "실무 상황",
   "difficulty": "중간",
   "source_version": "0.0.300",
@@ -490,7 +471,7 @@
   ]
  },
  {
-  "id": "q30",
+  "id": "q29",
   "type": "실무 상황",
   "difficulty": "어려움",
   "source_version": "0.1.20",
@@ -507,7 +488,7 @@
   ]
  },
  {
-  "id": "q31",
+  "id": "q30",
   "type": "버전 오가기",
   "difficulty": "중간",
   "source_version": "1.x",
@@ -526,7 +507,7 @@
   ]
  },
  {
-  "id": "q32",
+  "id": "q31",
   "type": "버전 오가기",
   "difficulty": "어려움",
   "source_version": "1.x",
@@ -542,7 +523,7 @@
   ]
  },
  {
-  "id": "q33",
+  "id": "q32",
   "type": "버전 오가기",
   "difficulty": "중간",
   "source_version": "1.x",
@@ -559,7 +540,7 @@
   ]
  },
  {
-  "id": "q34",
+  "id": "q33",
   "type": "버전 오가기",
   "difficulty": "중간",
   "source_version": "0.3.30",
@@ -574,7 +555,7 @@
   ]
  },
  {
-  "id": "q35",
+  "id": "q34",
   "type": "버전 오가기",
   "difficulty": "어려움",
   "source_version": "0.3.30",
@@ -591,7 +572,7 @@
   ]
  },
  {
-  "id": "q36",
+  "id": "q35",
   "type": "버전 오가기",
   "difficulty": "중간",
   "source_version": "0.0.300",

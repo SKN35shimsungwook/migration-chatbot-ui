@@ -112,8 +112,8 @@ def main() -> int:
 
     # 2-1. 버전 오가기 (변환할 버전 선택)
     qs = {q["id"]: q for q in json.loads((ROOT / "eval" / "questions.json").read_text(encoding="utf-8"))}
-    hops = [("1.x", "0.2.17", "q31", "되돌리면서"), (AUTO, "0.3.30", "q32", "그대로 두었어요"),
-            (AUTO, "0.2.17", "q31", "LangChain 1.x** 코드로")]
+    hops = [("1.x", "0.2.17", "q30", "되돌리면서"), (AUTO, "0.3.30", "q31", "그대로 두었어요"),
+            (AUTO, "0.2.17", "q30", "LangChain 1.x** 코드로")]
     for src, tgt, qid, expect in hops:
         at = login(app(), "봇사용자")
         at.selectbox(key="source_pick").set_value(src).run()
@@ -128,7 +128,7 @@ def main() -> int:
     at.selectbox(key="target_pick").set_value("0.2.17").run()
     check("같은 버전 고르면 안내", any("버전이 같아요" in w.value for w in at.warning))
 
-    # 2-2. 질문 36개 전부 화면에서 실행 (오류 없이 답이 나오는가)
+    # 2-2. 질문 35개 전부 화면에서 실행 (오류 없이 답이 나오는가)
     failed = []
     for q in qs.values():
         at = login(app(), "봇사용자")
@@ -142,7 +142,7 @@ def main() -> int:
 
     # 3. 사이드바 예시 질문 → 결과 패널
     at = login(app(), "봇사용자")
-    at.selectbox(key="example_pick").set_value("q31").run()
+    at.selectbox(key="example_pick").set_value("q30").run()
     at.button(key="send_example").click().run()
     picked = (at.selectbox(key="source_pick").value, at.selectbox(key="target_pick").value)
     check("사이드바 예시 질문 보내기 (질문의 버전으로 맞춤)",

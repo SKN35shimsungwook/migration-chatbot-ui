@@ -1,4 +1,4 @@
-"""실무형 질문 30개 (eval/questions.json) 를 만든다. 내용을 고칠 때는 이 파일을 고치고 다시 실행한다.
+"""실무형 질문 35개 (eval/questions.json) 를 만든다. 내용을 고칠 때는 이 파일을 고치고 다시 실행한다.
 
     python eval/build_questions.py
 """
@@ -103,18 +103,6 @@ db = FAISS.from_texts(["안녕하세요"], emb)
   ["설치 패키지 안내(langchain-huggingface)"], "0.2.17")
 
 # D. LLMChain → LCEL
-q("LLMChain → LCEL", "중간", "LLMChain이 없어졌다는데 같은 동작으로 바꿔 주세요.", '''
-from langchain.chat_models import ChatOpenAI
-from langchain.chains import LLMChain
-from langchain.prompts import PromptTemplate
-
-llm = ChatOpenAI(temperature=0)
-prompt = PromptTemplate.from_template("{product}을 만드는 회사 이름을 지어줘")
-chain = LLMChain(llm=llm, prompt=prompt)
-print(chain.run(product="양말"))
-''', ["from langchain_openai import ChatOpenAI", "from langchain_core.prompts import PromptTemplate",
-      "from langchain_core.output_parsers import StrOutputParser"],
-  ["LLMChain 없음", ".run( 없음 → invoke", "문자열 반환 유지(StrOutputParser)"], "0.0.300")
 q("LLMChain → LCEL", "중간", "predict랑 apply 쓰는 옛날 체인이에요. 여러 입력을 한 번에 돌리는 부분도 살려 주세요.", '''
 from langchain.llms import OpenAI
 from langchain.chains import LLMChain
