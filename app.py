@@ -21,6 +21,7 @@ import difflib
 import json
 import re
 import time
+from datetime import timedelta
 from pathlib import Path
 
 import streamlit as st
@@ -30,6 +31,8 @@ from src.ui.client import LATEST, TARGET_VERSIONS, mode, run
 from src.ui.optional import load
 from src.ui.mock import import_paths
 from src.ui.versions import ALL_WITH_NEW
+
+KST = timedelta(hours=9)  # DB 시각은 UTC 로 저장, 화면에는 한국 시간
 
 followups = load("followups")            # [선택 기능] 없으면 None
 version_detect = load("version_detect")  # [선택 기능] 없으면 None
@@ -271,7 +274,7 @@ def chat_screen() -> None:
         else:
             info = db.get_conversation(ss["conv_id"], ss["user"]["user_id"])
             if info:
-                st.caption(f":material/forum: 세션 #{info['conv_id']} · {info['created_at']:%m/%d %H:%M} 시작 · "
+                st.caption(f":material/forum: 세션 #{info['conv_id']} · {info['created_at'] + KST:%m/%d %H:%M} 시작 · "
                            f"메시지 {len(ss['messages'])}개 · 같은 세션에 이어서 저장 중")
         box = st.container(height=560)
         with box:
