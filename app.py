@@ -265,6 +265,14 @@ def chat_screen() -> None:
 
     chat_col, result_col = st.columns([1, 1.25], gap="large")
     with chat_col:
+        # 세션 = 대화 하나 ("새 대화"를 누를 때만 새로 시작, 그 안의 질문은 같은 세션에 이어서 저장)
+        if ss["conv_id"] is None:
+            st.caption(":material/fiber_new: 새 세션 · 첫 질문을 보내면 저장이 시작돼요")
+        else:
+            info = db.get_conversation(ss["conv_id"], ss["user"]["user_id"])
+            if info:
+                st.caption(f":material/forum: 세션 #{info['conv_id']} · {info['created_at']:%m/%d %H:%M} 시작 · "
+                           f"메시지 {len(ss['messages'])}개 · 같은 세션에 이어서 저장 중")
         box = st.container(height=560)
         with box:
             if not ss["messages"]:

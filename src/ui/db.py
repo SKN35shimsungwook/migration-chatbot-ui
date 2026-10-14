@@ -127,6 +127,14 @@ def create_conversation(user_id: int, title: str, source_version: str | None, ta
             target_version=target_version, created_at=_now(), updated_at=_now())).inserted_primary_key[0]
 
 
+def get_conversation(conv_id: int, user_id: int) -> dict | None:
+    """내 대화(세션) 하나의 정보. 다른 사용자 것이면 None."""
+    with engine().connect() as c:
+        row = c.execute(select(conversations).where(conversations.c.conv_id == conv_id,
+                                                    conversations.c.user_id == user_id)).mappings().first()
+    return dict(row) if row else None
+
+
 def get_messages(conv_id: int, user_id: int) -> list[dict]:
     """내 대화의 메시지만 돌려준다 (다른 사용자의 conv_id 를 넣으면 빈 목록)."""
     with engine().connect() as c:

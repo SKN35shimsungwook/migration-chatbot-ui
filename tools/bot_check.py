@@ -83,6 +83,20 @@ def main() -> int:
     nobody = login(app(), "없는사람")
     check("없는 username 로그인 막기", any("없어요" in e.value for e in nobody.error))
 
+    # 1-1. 세션: 한 대화 안에서 질문 여러 개 → 대화 1개, "새 대화" → 세션 하나 더
+    at = signup(app(), "세션봇")
+    for text in ("from langchain.chat_models import ChatOpenAI\n", "from langchain.prompts import PromptTemplate\n"):
+        at.chat_input[0].set_value(text).run()
+    at.selectbox(key="example_pick").set_value("q01").run()
+    at.button(key="send_example").click().run()
+    sessions = [b for b in at.sidebar.button if b.key and b.key.startswith("conv_")]
+    check("한 세션에 질문 3개 이어서 저장", len(sessions) == 1 and len(at.session_state["messages"]) == 6,
+          f"세션 {len(sessions)}개 · 메시지 {len(at.session_state['messages'])}개")
+    [b for b in at.sidebar.button if "새 대화" in b.label][0].click().run()
+    at.chat_input[0].set_value("from langchain.llms import OpenAI\n").run()
+    sessions = [b for b in at.sidebar.button if b.key and b.key.startswith("conv_")]
+    check("새 대화 → 새 세션", len(sessions) == 2, f"세션 {len(sessions)}개")
+
     # 2. 버전 선택 × 코드
     for pick, code_name, expect in VERSION_CASES:
         at = login(app(), "봇사용자")
