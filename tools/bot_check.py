@@ -85,10 +85,9 @@ def main() -> int:
 
     # 1-1. 세션: 한 대화 안에서 질문 여러 개 → 대화 1개, "새 대화" → 세션 하나 더
     at = signup(app(), "세션봇")
-    for text in ("from langchain.chat_models import ChatOpenAI\n", "from langchain.prompts import PromptTemplate\n"):
+    for text in ("from langchain.chat_models import ChatOpenAI\n", "from langchain.prompts import PromptTemplate\n",
+                 "from langchain.chains import LLMChain\n"):
         at.chat_input[0].set_value(text).run()
-    at.selectbox(key="example_pick").set_value("q01").run()
-    at.button(key="send_example").click().run()
     sessions = [b for b in at.sidebar.button if b.key and b.key.startswith("conv_")]
     check("한 세션에 질문 3개 이어서 저장", len(sessions) == 1 and len(at.session_state["messages"]) == 6,
           f"세션 {len(sessions)}개 · 메시지 {len(at.session_state['messages'])}개")
@@ -140,14 +139,10 @@ def main() -> int:
             failed.append(q["id"])
     check(f"질문 {len(qs)}개 전부 실행", not failed, f"실패: {failed}" if failed else "오류 없음")
 
-    # 3. 사이드바 예시 질문 → 결과 패널
+    # 3. 코드 붙여 넣기 → 결과 패널
     at = login(app(), "봇사용자")
-    at.selectbox(key="example_pick").set_value("q30").run()
-    at.button(key="send_example").click().run()
-    picked = (at.selectbox(key="source_pick").value, at.selectbox(key="target_pick").value)
-    check("사이드바 예시 질문 보내기 (질문의 버전으로 맞춤)",
-          not at.exception and picked == ("1.x", "0.2.17") and any("검증" in m.value for m in at.markdown),
-          f"버전 {picked[0]} → {picked[1]}")
+    at.chat_input[0].set_value(COMMON).run()
+    check("코드 붙여 넣기 → 결과 패널", not at.exception and any("검증" in m.value for m in at.markdown))
 
     # 4. 코드 없는 질문 (키 없을 때 안내)
     at.chat_input[0].set_value("LCEL이 뭐야?").run()

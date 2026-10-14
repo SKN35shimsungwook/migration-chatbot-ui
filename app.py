@@ -7,7 +7,6 @@
 구성
     로그인     username (중복 금지) → TiDB users 테이블 (user_id)
     사이드바   ChatGPT 처럼: 새 대화, 내 대화 목록, 로그아웃
-    사이드바   예시 질문 (실무형 35개 중 골라 보내기)
     본문       위: 지금 코드 버전 · 변환할 버전 선택 / 왼쪽: 채팅 / 오른쪽: 결과 패널 (전후 비교 · 변경표 · 근거)
 챗봇 호출은 src/ui/client.py 한 곳. 대화 기록은 src/ui/db.py (TiDB, 없으면 SQLite).
 
@@ -18,11 +17,9 @@
 """
 
 import difflib
-import json
 import re
 import time
 from datetime import timedelta
-from pathlib import Path
 
 import streamlit as st
 
@@ -40,7 +37,6 @@ version_detect = load("version_detect")  # [선택 기능] 없으면 None
 st.set_page_config(page_title="LangChain 마이그레이션 어시스턴트", page_icon=":material/sync_alt:", layout="wide")
 
 APP_NAME = "LangChain 버전 마이그레이션 코드 어시스턴트"
-QUESTIONS = json.loads((Path(__file__).parent / "eval" / "questions.json").read_text(encoding="utf-8"))
 AUTO = "자동 감지"
 KIND_LABEL = {"native": "최신 위치", "moved": "위치 이동", "same": "그대로", "classic_fallback": "옛 창고(classic)",
               "unresolved": "못 찾음"}
@@ -63,14 +59,6 @@ def open_chat(conv_id: int) -> None:
     ss["conv_id"], ss["followups"] = conv_id, []
     ss["messages"] = [{"role": m["role"], "content": m["content"], "result": m["result"]}
                       for m in db.get_messages(conv_id, ss["user"]["user_id"])]
-
-
-def send_example() -> None:
-    """사이드바 예시 질문: 질문의 버전으로 맞추고 보낸다 (위젯이 그려지기 전에 실행되는 콜백)."""
-    q = next(x for x in QUESTIONS if x["id"] == ss["example_pick"])
-    ss["source_pick"] = q["source_version"] if q["source_version"] in ALL_WITH_NEW else AUTO
-    ss["target_pick"] = q.get("target_version", "1.x")
-    ss["pending"] = f"{q['request']}\n\n```python\n{q['code']}```"
 
 
 def logout() -> None:
@@ -166,12 +154,6 @@ def sidebar() -> None:
     with st.sidebar:
         st.markdown(f"### {APP_NAME}")
         st.button("새 대화", icon=":material/edit_square:", width="stretch", on_click=new_chat)
-        with st.expander(f"예시 질문 ({len(QUESTIONS)}개)", icon=":material/lightbulb:"):
-            st.selectbox("질문 고르기", [q["id"] for q in QUESTIONS], key="example_pick",
-                         format_func=lambda i: next(f"{q['type']} · {q['request'][:30]}" for q in QUESTIONS
-                                                    if q["id"] == i))
-            st.button("이 질문 보내기", icon=":material/send:", width="stretch", type="primary",
-                      key="send_example", on_click=send_example)
         st.caption("내 대화")
         convs = db.list_conversations(ss["user"]["user_id"])
         if not convs:
@@ -277,7 +259,7 @@ def chat_screen() -> None:
         with box:
             if not ss["messages"]:
                 with st.chat_message("assistant"):
-                    st.write("옛 LangChain 코드를 붙여 넣거나, 왼쪽 사이드바의 **예시 질문**을 골라 보내 보세요.")
+                    st.write("옛 LangChain 코드를 붙여 넣어 보세요. 바꿀 버전은 위에서 고를 수 있어요.")
             for m in ss["messages"]:
                 with st.chat_message(m["role"]):
                     st.markdown(as_markdown(m["content"]) if m["role"] == "user" else m["content"])
