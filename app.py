@@ -7,24 +7,32 @@
 구성
     로그인     username (중복 금지) → TiDB users 테이블 (user_id)
     사이드바   ChatGPT 처럼: 새 대화, 내 대화 목록, 로그아웃
-    본문       위: 옛 버전 · 목표 버전 선택 / 왼쪽: 채팅 / 오른쪽: 결과 패널 (전후 비교 · 변경표 · 근거 · 진행 과정)
-    연상 질문  답변 아래 "이어서 물어보기" (LLM)
+    사이드바   예시 질문 (실무형 36개 중 골라 보내기)
+    본문       위: 지금 코드 버전 · 변환할 버전 선택 / 왼쪽: 채팅 / 오른쪽: 결과 패널 (전후 비교 · 변경표 · 근거 · 진행 과정)
 챗봇 호출은 src/ui/client.py 한 곳. 대화 기록은 src/ui/db.py (TiDB, 없으면 SQLite).
+
+[선택 기능] 4번 영역이 아닌 기능은 src/ui/extras/ 에 있고 load() 로만 부른다. 폴더를 빼면 그 기능만 사라진다.
+    followups       연상 질문(이어서 물어보기), 코드 없는 질문 답변
+    version_detect  지금 코드 버전 자동 감지
+자세한 정리: docs/머지_가이드.md
 """
 
 import difflib
 import json
-import random
 import re
 import time
 from pathlib import Path
 
 import streamlit as st
 
-from src.ui import db, llm
+from src.ui import db
 from src.ui.client import LATEST, TARGET_VERSIONS, mode, run
+from src.ui.optional import load
 from src.ui.mock import import_paths
-from src.ui.versions import ALL_WITH_NEW, describe
+from src.ui.versions import ALL_WITH_NEW
+
+followups = load("followups")            # [선택 기능] 없으면 None
+version_detect = load("version_detect")  # [선택 기능] 없으면 None
 
 st.set_page_config(page_title="LangChain 마이그레이션 어시스턴트", page_icon=":material/sync_alt:", layout="wide")
 
@@ -41,13 +49,11 @@ ss.setdefault("user", None)
 ss.setdefault("conv_id", None)
 ss.setdefault("messages", [])
 ss.setdefault("followups", [])
-ss.setdefault("starters", random.sample(QUESTIONS, 4))
 
 
 # ---------------------------------------------------------------- 공통
 def new_chat() -> None:
     ss["conv_id"], ss["messages"], ss["followups"] = None, [], []
-    ss["starters"] = random.sample(QUESTIONS, 4)
 
 
 def open_chat(conv_id: int) -> None:
@@ -56,8 +62,9 @@ def open_chat(conv_id: int) -> None:
                       for m in db.get_messages(conv_id, ss["user"]["user_id"])]
 
 
-def use_starter(q: dict) -> None:
-    """예시 질문: 질문의 버전으로 맞추고 보낸다 (위젯이 그려지기 전에 실행되는 콜백)."""
+def send_example() -> None:
+    """사이드바 예시 질문: 질문의 버전으로 맞추고 보낸다 (위젯이 그려지기 전에 실행되는 콜백)."""
+    q = next(x for x in QUESTIONS if x["id"] == ss["example_pick"])
     ss["source_pick"] = q["source_version"] if q["source_version"] in ALL_WITH_NEW else AUTO
     ss["target_pick"] = q.get("target_version", "1.x")
     ss["pending"] = f"{q['request']}\n\n```python\n{q['code']}```"
@@ -106,9 +113,12 @@ def summary(result: dict) -> str:
 
 
 def version_note(result: dict) -> str | None:
+    """[선택 기능: version_detect] 버전 감지 안내. 기능이 없으면 안내도 없음."""
     d = result["detected"]
+    if version_detect is None or not d["candidates"]:
+        return None
     if result["source_version"] is None:
-        return describe(d)
+        return version_detect.describe(d)
     if result["source_version"] not in d["candidates"]:
         span = d["candidates"][0] if len(d["candidates"]) == 1 else f"{d['candidates'][0]} ~ {d['candidates'][-1]}"
         return (f"고르신 버전은 {result['source_version']}인데, 코드는 **{span}** 시기 코드로 보여요 "
@@ -153,6 +163,12 @@ def sidebar() -> None:
     with st.sidebar:
         st.markdown(f"### {APP_NAME}")
         st.button("새 대화", icon=":material/edit_square:", width="stretch", on_click=new_chat)
+        with st.expander(f"예시 질문 ({len(QUESTIONS)}개)", icon=":material/lightbulb:"):
+            st.selectbox("질문 고르기", [q["id"] for q in QUESTIONS], key="example_pick",
+                         format_func=lambda i: next(f"{q['type']} · {q['request'][:30]}" for q in QUESTIONS
+                                                    if q["id"] == i))
+            st.button("이 질문 보내기", icon=":material/send:", width="stretch", type="primary",
+                      key="send_example", on_click=send_example)
         st.caption("내 대화")
         convs = db.list_conversations(ss["user"]["user_id"])
         if not convs:
@@ -224,11 +240,15 @@ def handle(text: str, source: str | None, target: str) -> None:
         result = run(code, target, source)
         note = version_note(result) if result["verification"]["success"] else None
         reply = (note + "\n\n" if note else "") + summary(result)
+    elif followups is not None:            # [선택 기능: followups] 코드 없는 질문에 LLM 이 답함
+        reply = followups.answer(text, ss["messages"][:-1])
     else:
-        reply = llm.answer(text, ss["messages"][:-1])
+        reply = "옛 LangChain 코드를 붙여 넣어 주세요. 코드가 있어야 바꿔 드릴 수 있어요."
     ss["messages"].append({"role": "assistant", "content": reply, "result": result})
     db.add_message(ss["conv_id"], "assistant", reply, result)
-    ss["followups"] = llm.followups(text, result)
+    # [선택 기능: followups] 연상 질문 — 시작
+    ss["followups"] = followups.followups(text, result) if followups is not None else []
+    # [선택 기능: followups] 연상 질문 — 끝
 
 
 def chat_screen() -> None:
@@ -249,21 +269,19 @@ def chat_screen() -> None:
         with box:
             if not ss["messages"]:
                 with st.chat_message("assistant"):
-                    st.write("옛 LangChain 코드를 붙여 넣거나, 아래 예시 질문을 눌러 보세요. "
-                             "버전을 모르면 자동으로 짐작해 드려요.")
-                for i, q in enumerate(ss["starters"]):
-                    st.button(f"{q['type']} · {q['request'][:38]}", key=f"starter_{i}", width="stretch",
-                              on_click=use_starter, args=(q,))
+                    st.write("옛 LangChain 코드를 붙여 넣거나, 왼쪽 사이드바의 **예시 질문**을 골라 보내 보세요.")
             for m in ss["messages"]:
                 with st.chat_message(m["role"]):
                     st.markdown(as_markdown(m["content"]) if m["role"] == "user" else m["content"])
-            if ss["followups"]:
+            # [선택 기능: followups] 이어서 물어보기 버튼 — 시작
+            if followups is not None and ss["followups"]:
                 st.caption("이어서 물어보기")
                 for i, f in enumerate(ss["followups"]):
                     if st.button(f, key=f"follow_{i}", icon=":material/subdirectory_arrow_right:", width="stretch"):
                         ss["pending"] = f
-            elif ss["messages"] and not llm.api_key():
+            elif followups is not None and ss["messages"] and not followups.api_key():
                 st.caption("OpenAI 키를 설정하면 이어서 물어볼 질문이 여기에 나와요.")
+            # [선택 기능: followups] 이어서 물어보기 버튼 — 끝
         typed = st.chat_input("옛 코드나 질문을 입력하세요 (여러 줄은 Shift+Enter)")
         text = typed or ss.pop("pending", None)
         if text:

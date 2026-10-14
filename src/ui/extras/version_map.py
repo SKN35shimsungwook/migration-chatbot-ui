@@ -1,4 +1,4 @@
-"""버전 ↔ 버전 import 대응 (어느 방향이든).
+"""[선택 기능 · 4번 영역 아님] 버전 ↔ 버전 import 대응 (어느 방향이든).
 
 2번이 뽑아 둔 버전별 도구 목록(data/raw/symbols/{패키지}-{버전}.jsonl)을 비교한다.
   - 옛 경로가 목표 버전에도 있으면 → 그대로 (same)
@@ -13,7 +13,7 @@ import os
 from functools import lru_cache
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[3]
 SYMBOLS = Path(os.environ.get("MIGRATION_SYMBOLS_DIR") or ROOT / "data" / "raw" / "symbols")
 
 # 화면의 버전 → 그 시기에 함께 쓰던 패키지 목록 (2번 도구 목록 파일 이름)

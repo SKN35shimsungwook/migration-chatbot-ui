@@ -51,7 +51,7 @@ def try_imports(py: str, lines: list[str]) -> dict[str, str | None]:
 
 def check_static(q: dict) -> int:
     """목표가 0.x 인 질문: 2번 도구 목록으로 확인."""
-    from src.ui import version_map as vm
+    from src.ui.extras import version_map as vm
     tgt = q["target_version"]
     problems = []
     if not vm.available():

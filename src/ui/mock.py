@@ -51,9 +51,10 @@ def find_evidence(path: str, target: str = "1.x") -> dict | None:
     1.x 로 갈 때: 2번 import 대응표(imap-…) → 없으면 2번 버전별 도구 목록 → 없으면 예시표
     그 밖의 버전으로 갈 때(되돌리기 포함): 2번 버전별 도구 목록 (version_map.py)
     """
-    from . import version_map as vm
+    from .optional import load
+    vm = load("version_map")
     if target != "1.x":
-        if not vm.available():
+        if vm is None or not vm.available():
             return None
         t = vm.translate(path, target)
         return {"old": path, "new": t["new"], "kind": t["kind"], "evidence_id": f"ver-{target}:{t['new'] or path}",
@@ -62,7 +63,7 @@ def find_evidence(path: str, target: str = "1.x") -> dict | None:
         from src.rag.retrieval.import_lookup import lookup  # 팀 저장소에 2번 코드가 있을 때
         hit = lookup(path)
         if hit is None:
-            if vm.available():
+            if vm is not None and vm.available():
                 t = vm.translate(path, "1.x")
                 return {"old": path, "new": t["new"], "kind": t["kind"], "evidence_id": f"ver-1.x:{t['new'] or path}",
                         "source": "version_symbols", "alternative": None, "real": True}
@@ -119,7 +120,8 @@ def fake_rewrite(code: str, evidences: list[dict], target: str = "1.x") -> str:
 
 def run_mock(code: str, target_version: str) -> dict:
     """화면이 기대하는 결과 모양 (docs/화면_결과_모양.md)."""
-    from . import version_map as vm
+    from .optional import load
+    vm = load("version_map")
     evidences = []
     paths = import_paths(code)
     for line, path in paths:
@@ -127,8 +129,9 @@ def run_mock(code: str, target_version: str) -> dict:
         if ev:
             ev["line"] = line
             evidences.append(ev)
-    if not evidences and paths and target_version != "1.x" and not vm.available():
-        message = ("1.x 가 아닌 버전으로 바꾸려면 2번의 버전별 도구 목록(data/raw/symbols)이 필요해요. "
+    if not evidences and paths and target_version != "1.x" and (vm is None or not vm.available()):
+        message = ("1.x 가 아닌 버전으로 바꾸는 기능이 빠져 있어요 (선택 기능 src/ui/extras/version_map.py)." if vm is None else
+                   "1.x 가 아닌 버전으로 바꾸려면 2번의 버전별 도구 목록(data/raw/symbols)이 필요해요. "
                    "팀 저장소에서 실행하면 모든 버전 방향으로 바꿀 수 있어요.")
         return {"target_version": target_version, "original_code": code, "migrated_code": code,
                 "changes": [], "steps": _steps(len(paths), ok=False),

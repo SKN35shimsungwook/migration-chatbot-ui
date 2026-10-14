@@ -126,10 +126,14 @@ def main() -> int:
             failed.append(q["id"])
     check(f"질문 {len(qs)}개 전부 실행", not failed, f"실패: {failed}" if failed else "오류 없음")
 
-    # 3. 예시 질문 버튼 → 결과 패널
+    # 3. 사이드바 예시 질문 → 결과 패널
     at = login(app(), "봇사용자")
-    at.button(key="starter_0").click().run()
-    check("예시 질문 버튼", not at.exception and any("검증" in m.value or "변환 못 함" in m.value for m in at.markdown))
+    at.selectbox(key="example_pick").set_value("q31").run()
+    at.button(key="send_example").click().run()
+    picked = (at.selectbox(key="source_pick").value, at.selectbox(key="target_pick").value)
+    check("사이드바 예시 질문 보내기 (질문의 버전으로 맞춤)",
+          not at.exception and picked == ("1.x", "0.2.17") and any("검증" in m.value for m in at.markdown),
+          f"버전 {picked[0]} → {picked[1]}")
 
     # 4. 코드 없는 질문 (키 없을 때 안내)
     at.chat_input[0].set_value("LCEL이 뭐야?").run()
