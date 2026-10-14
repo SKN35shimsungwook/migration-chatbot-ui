@@ -134,14 +134,14 @@ def run_mock(code: str, target_version: str) -> dict:
                    "1.x 가 아닌 버전으로 바꾸려면 2번의 버전별 도구 목록(data/raw/symbols)이 필요해요. "
                    "팀 저장소에서 실행하면 모든 버전 방향으로 바꿀 수 있어요.")
         return {"target_version": target_version, "original_code": code, "migrated_code": code,
-                "changes": [], "steps": _steps(len(paths), ok=False),
+                "changes": [],
                 "verification": {"success": False, "attempts": 0, "message": message}, "mode": "mock"}
     if not evidences:
         message = ("LangChain import 줄을 찾지 못했습니다. 옛 LangChain 코드를 넣어 주세요." if not paths else
                    f"LangChain import {len(paths)}줄을 찾았지만 대응표에서 근거를 찾지 못했어요. "
                    "(지금은 예시 대응표라 일부만 있어요. 팀 저장소에서는 2번 대응표 전체를 씁니다.)")
         return {"target_version": target_version, "original_code": code, "migrated_code": code,
-                "changes": [], "steps": _steps(len(paths), ok=False),
+                "changes": [],
                 "verification": {"success": False, "attempts": 0, "message": message}, "mode": "mock"}
     migrated = fake_rewrite(code, evidences, target_version)
     changes = [{"old": ev["line"], "new": replacement_line(ev) or "-",
@@ -151,20 +151,8 @@ def run_mock(code: str, target_version: str) -> dict:
     has_classic = any(c["kind"] == "classic_fallback" for c in changes)
     attempts = 2 if has_classic else 1
     return {"target_version": target_version, "original_code": code, "migrated_code": migrated,
-            "changes": changes, "steps": _steps(len(evidences), ok=True, retry=has_classic),
+            "changes": changes,
             "verification": {"success": True, "attempts": attempts,
                              "message": f"{attempts}회 만에 통과 (가짜 결과)"},
             "mode": "mock+real_evidence" if any(c["real_evidence"] for c in changes) else "mock"}
 
-
-def _steps(n: int, ok: bool, retry: bool = False) -> list[dict]:
-    steps = [{"name": "① analyzer", "detail": f"import 경로 {n}개 찾음"},
-             {"name": "② retriever", "detail": "대응표 · 문서에서 근거 찾기"},
-             {"name": "③ rewriter", "detail": "근거를 보고 코드 다시 쓰기"}]
-    if retry:
-        steps += [{"name": "④ verifier", "detail": "1회차: 옛 방식(classic) 사용 → 다시 찾기"},
-                  {"name": "② retriever", "detail": "대안 문서 더 찾기"},
-                  {"name": "③ rewriter", "detail": "최신 방식으로 다시 쓰기"}]
-    steps += [{"name": "④ verifier", "detail": "실행해서 확인 → 통과" if ok else "확인할 코드 없음"},
-              {"name": "⑤ report", "detail": "결과 정리"}]
-    return steps

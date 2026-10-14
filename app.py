@@ -7,8 +7,8 @@
 구성
     로그인     username (중복 금지) → TiDB users 테이블 (user_id)
     사이드바   ChatGPT 처럼: 새 대화, 내 대화 목록, 로그아웃
-    사이드바   예시 질문 (실무형 36개 중 골라 보내기)
-    본문       위: 지금 코드 버전 · 변환할 버전 선택 / 왼쪽: 채팅 / 오른쪽: 결과 패널 (전후 비교 · 변경표 · 근거 · 진행 과정)
+    사이드바   예시 질문 (실무형 35개 중 골라 보내기)
+    본문       위: 지금 코드 버전 · 변환할 버전 선택 / 왼쪽: 채팅 / 오른쪽: 결과 패널 (전후 비교 · 변경표 · 근거)
 챗봇 호출은 src/ui/client.py 한 곳. 대화 기록은 src/ui/db.py (TiDB, 없으면 SQLite).
 
 [선택 기능] 4번 영역이 아닌 기능은 src/ui/extras/ 에 있고 load() 로만 부른다. 폴더를 빼면 그 기능만 사라진다.
@@ -207,7 +207,7 @@ def show_result(result: dict) -> None:
     if not v["success"]:
         st.warning(v["message"])
         return
-    before, after, steps = st.tabs(["전후 비교", "변경표 · 근거", "진행 과정"])
+    before, after = st.tabs(["전후 비교", "변경표 · 근거"])
     with before:
         left, right = st.columns(2)
         left.caption("변경 전")
@@ -222,9 +222,6 @@ def show_result(result: dict) -> None:
         st.table([{"옛 줄": c["old"], "새 줄": c["new"], "종류": KIND_LABEL.get(c["kind"], c["kind"]),
                    "대안": c["alternative"] or "", "근거 ID": c["evidence_id"]} for c in result["changes"]])
         st.caption("옛 창고(classic)는 1.x에서 없어져 langchain_classic에만 남은 기능입니다. 대안이 있으면 최신 방식으로 바꿉니다.")
-    with steps:
-        for s in result["steps"]:
-            st.markdown(f"**{s['name']}** · {s['detail']}")
 
 
 # ---------------------------------------------------------------- 대화 처리
@@ -310,7 +307,7 @@ def chat_screen() -> None:
         if last:
             show_result(last)
         else:
-            st.info("코드를 넣으면 여기에 전후 비교, 바뀐 줄과 근거, 진행 과정이 나옵니다.", icon=":material/arrow_back:")
+            st.info("코드를 넣으면 여기에 전후 비교, 바뀐 줄과 근거가 나옵니다.", icon=":material/arrow_back:")
 
 
 # ---------------------------------------------------------------- 시작
