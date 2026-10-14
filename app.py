@@ -18,7 +18,9 @@
 """
 
 import difflib
+import json
 import re
+from pathlib import Path
 import time
 from datetime import timedelta
 
@@ -40,7 +42,10 @@ st.set_page_config(page_title="LangChain 마이그레이션 어시스턴트", pa
 APP_NAME = "LangChain 버전 마이그레이션 코드 어시스턴트"
 AUTO = "자동 감지"
 KIND_LABEL = {"native": "최신 위치", "moved": "위치 이동", "same": "그대로", "classic_fallback": "옛 창고(classic)",
-              "unresolved": "못 찾음"}
+              "unresolved": "못 찾음", "deprecated": "옛 메서드", "removed": "없어진 메서드", "exists": "그대로"}
+# 확인용 예제: 평가 질문 중 1.x 로 올리는 30개 (팀 그래프가 지원하는 방향)
+EXAMPLES = [q for q in json.loads((Path(__file__).parent / "eval" / "questions.json").read_text(encoding="utf-8"))
+            if q["target_version"] == "1.x" and q["type"] != "버전 오가기"]
 ORDER = ALL_WITH_NEW
 USER_ID_RULE = re.compile(r"^[0-9A-Za-z가-힣_]{2,20}$")
 
@@ -63,6 +68,14 @@ def open_chat(session_id: str) -> None:
     for row in db.get_history(session_id, ss["user"]["user_id"]):
         ss["messages"].append({"role": "user", "content": row["question"], "result": None})
         ss["messages"].append({"role": "assistant", "content": row["answer"] or "", "result": None})
+
+
+def send_example() -> None:
+    """확인용 예제: 그 질문의 버전으로 맞추고 보낸다 (위젯이 그려지기 전에 실행되는 콜백)."""
+    q = next(x for x in EXAMPLES if x["id"] == ss["example_pick"])
+    ss["source_pick"] = q["source_version"] if q["source_version"] in ALL_WITH_NEW else AUTO
+    ss["target_pick"] = q["target_version"]
+    ss["pending"] = f"{q['request']}\n\n```python\n{q['code']}```"
 
 
 def logout() -> None:
@@ -168,6 +181,14 @@ def sidebar() -> None:
     with st.sidebar:
         st.markdown(f"### {APP_NAME}")
         st.button("새 대화", icon=":material/edit_square:", width="stretch", on_click=new_chat)
+        with st.expander(f"확인용 예제 ({len(EXAMPLES)}개)", icon=":material/science:"):
+            st.selectbox("예제 고르기", [q["id"] for q in EXAMPLES], key="example_pick",
+                         format_func=lambda i: next(f"{q['id']} · {q['type']} · {q['difficulty']}" for q in EXAMPLES
+                                                    if q["id"] == i))
+            pick = next(q for q in EXAMPLES if q["id"] == ss.get("example_pick", EXAMPLES[0]["id"]))
+            st.caption(f"{pick['request']} (지금 코드 {pick['source_version']} → 1.x)")
+            st.button("이 예제 보내기", icon=":material/send:", width="stretch", type="primary",
+                      key="send_example", on_click=send_example)
         st.caption("내 대화")
         sessions = db.list_sessions(ss["user"]["user_id"])
         if not sessions:
