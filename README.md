@@ -1,5 +1,11 @@
 # 마이그레이션 챗봇 화면 (4번 · 화면)
 
+> **📌 현재 상태 (2026-10-15 발표 기준)** — 이 저장소는 **초기 화면 개발 저장소** (10-13 ~ 10-15 오전) 입니다. 최신 코드 · 결과 · 문서는 아래에 있습니다.
+> - **배포 화면 (Langration)**: https://langchain-migration-assistant-btn5chcr8ragnwts68rmhf.streamlit.app
+> - **배포 저장소 (최신 전체)**: [langchain-migration-assistant](https://github.com/SKN35shimsungwook/langchain-migration-assistant) — README · [프로젝트 최종 보고서](https://github.com/SKN35shimsungwook/langchain-migration-assistant/blob/main/docs/프로젝트_최종_보고서.md) · [작업 기록](https://github.com/SKN35shimsungwook/langchain-migration-assistant/blob/main/docs/작업_기록.md) · [발표자료](https://github.com/SKN35shimsungwook/langchain-migration-assistant/tree/main/발표자료)
+> - **팀 저장소**: [SKN35-3rd-4Team](https://github.com/SKNETWORKS-FAMILY-AICAMP/SKN35-3rd-4Team) (dev · sungwook)
+> - **결과**: 같은 gpt-4o-mini로 공통 기준 통과 일반 LLM 0% → 우리 챗봇 57% (실행 기준 0% → 87%), 자체 평가 83.3점 · 평가 질문 36개(1.x로 올리기 30 + 버전 오가기 6)
+
 **배포 주소**: [https://migration-chatbot-ui-47wunvzaww7qc27nmwufvh.streamlit.app/](https://migration-chatbot-ui-47wunvzaww7qc27nmwufvh.streamlit.app/)
 
 > 팀 프로젝트 **LangChain 버전 마이그레이션 챗봇**의 화면을 먼저 만들어 보는 4번 작업 저장소입니다.
